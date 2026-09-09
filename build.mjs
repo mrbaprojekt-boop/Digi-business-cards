@@ -360,15 +360,19 @@ function embedSnippet(emp, co, ctx) {
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;");
   const s = JSON.stringify(emp.slug);
+  // Generous initial height so the card is never clipped even if the resize
+  // script below is missing (e.g. an incomplete copy-paste). The script then
+  // trims it to the exact content height.
   return `<!-- ${fullName} — C.D.R Technology digital business card -->
 <div style="width:100%;max-width:460px;margin:0 auto">
   <iframe id="cdrcard-${esc(emp.slug)}" title="${attr(fullName)} — business card" loading="lazy"
-    scrolling="no" style="width:100%;border:0;display:block;overflow:hidden;height:1100px"
+    scrolling="no" style="width:100%;border:0;display:block;overflow:hidden;height:2000px"
     srcdoc="${doc}"></iframe>
 </div>
 <script>
 (function(){
   var f = document.getElementById("cdrcard-${esc(emp.slug)}");
+  if (!f) return;
   window.addEventListener("message", function(e){
     var d = e.data;
     if (d && d.__cdrcard === ${s} && d.h) f.style.height = d.h + "px";
