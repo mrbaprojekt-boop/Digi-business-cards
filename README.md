@@ -19,7 +19,7 @@ Digi-business-cards/
 ├── build.mjs             ← generator (do not edit unless changing design)
 ├── serve.mjs             ← local preview server
 ├── package.json          ← npm scripts
-├── docs/                 ← GENERATED output — published by GitHub Pages
+├── docs/                 ← GENERATED output — this folder is the website you upload
 │   ├── index.html            list of all cards
 │   ├── <slug>.html           one employee card
 │   └── <slug>.vcf            one contact file
@@ -156,21 +156,31 @@ your computer's local IP (e.g. `192.168.1.20`) and open `http://192.168.1.20:808
 
 ---
 
-## 6. Publish (GitHub Pages)
+## 6. Publish (upload to the cdr.ee server)
 
-The repo is already set up so that the `docs/` folder is the website.
+The whole site is the **`docs/`** folder — plain static files, no server code.
+Publishing = copy the *contents* of `docs/` to a folder on the cdr.ee hosting.
 
-1. Push to GitHub (see below).
-2. On GitHub: **Settings → Pages**.
-3. **Build and deployment → Source: Deploy from a branch.**
-4. **Branch: `main`, folder: `/docs`.** Save.
-5. Wait ~1 minute. The site goes live at:
+Target: **`https://cdr.ee/business-cards/`** (set in `data/employees.json` → `baseUrl`).
 
-   ```
-   https://mrbaprojekt-boop.github.io/Digi-business-cards/
-   ```
+1. `npm run build` — refresh `docs/`.
+2. Open the cdr.ee hosting (cPanel / FTP / SFTP — whatever CDR uses).
+3. In the web root (next to the main site's `index.html`), create a folder **`business-cards`**.
+4. Upload **everything inside `docs/`** into it — `index.html`, every `*.html`, every `*.vcf`.
+   (The `.nojekyll` file is only for GitHub Pages; it does no harm but isn't needed here.)
+5. Check: <https://cdr.ee/business-cards/> shows the list, and
+   <https://cdr.ee/business-cards/elmahdi-lamine.html> shows the card.
 
-Every time you change data, run `npm run build`, then commit and push `docs/`:
+On every later change: `npm run build`, then re-upload the changed files from `docs/`
+(or just re-upload the whole folder — it's tiny).
+
+> **If you publish under a different path** (e.g. `cards.cdr.ee`, or `cdr.ee/cards/`):
+> change `baseUrl` in `data/employees.json` to that exact address, run `npm run build`,
+> and re-upload. The QR codes and the Share button are generated from `baseUrl`.
+
+### Keeping the git repo in sync (optional)
+
+The GitHub repo (`Digi-business-cards`, private) is just the backup / edit history:
 
 ```bash
 npm run build
@@ -179,12 +189,6 @@ git commit -m "Update cards"
 git push
 ```
 
-GitHub Pages redeploys automatically within a minute.
-
-> Prefer a nicer URL like `cards.cdr.ee`? Add a `CNAME` record at your DNS provider
-> pointing to `mrbaprojekt-boop.github.io`, set the custom domain in Settings → Pages,
-> then change `baseUrl` in `data/employees.json` to `https://cards.cdr.ee` and rebuild.
-
 ---
 
 ## 7. How employees actually use the card
@@ -192,7 +196,7 @@ GitHub Pages redeploys automatically within a minute.
 Each person has three things: a **URL**, a **QR code** (shown on their own card page),
 and a **`.vcf`** contact file.
 
-**Give each employee their link**, e.g. `https://mrbaprojekt-boop.github.io/Digi-business-cards/elmahdi-lamine.html`
+**Give each employee their link**, e.g. `https://cdr.ee/business-cards/elmahdi-lamine.html`
 
 Ways to hand it to a contact:
 

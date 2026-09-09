@@ -58,7 +58,8 @@ The working directory is `module 5 Создание продуктов с нул
    Get-ChildItem (Join-Path $PWD.Path "digital-business-cards\docs") | Select Name
    ```
    Tell the user who was affected and which files in `docs/` changed. Remind them to
-   `git add -A && git commit && git push` so GitHub Pages redeploys.
+   re-upload `docs/` to the cdr.ee server (folder `business-cards`), and optionally
+   `git add -A && git commit && git push` to back the change up on GitHub.
 
 ### Visual check (optional / when restyling)
 
@@ -79,7 +80,7 @@ and when done: `Get-Process node | Stop-Process -Force`.
     "unit": "GPU & GSE Equipment",       // badge under the tagline; "" removes it
     "website": "https://cdr.ee",
     "websiteLabel": "cdr.ee",            // how the link is shown
-    "baseUrl": "https://mrbaprojekt-boop.github.io/Digi-business-cards", // where cards are published; QR + Share derive from it. "" → QR points to the file itself
+    "baseUrl": "https://cdr.ee/business-cards", // where cards are published (uploaded to the cdr.ee server); QR + Share derive from it. "" → QR points to the file itself
     "address": { "street": "...", "locality": "...", "postalCode": "...", "country": "..." }
   },
   "employees": [
