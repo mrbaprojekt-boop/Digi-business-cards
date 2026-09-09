@@ -1,0 +1,29 @@
+{
+  "company": {
+    "name": "CDR",
+    "tagline": "Creative | Development | Research",
+    "unit": "GPU & GSE Equipment",
+    "website": "https://cdr.ee",
+    "websiteLabel": "cdr.ee",
+    "baseUrl": "https://mrbaprojekt-boop.github.io/Digi-business-cards",
+    "address": {
+      "street": "Taevavärava tee 6b-24",
+      "locality": "Lehmja küla, Rae vald",
+      "postalCode": "75306",
+      "country": "Estonia"
+    }
+  },
+  "employees": [
+    {
+      "slug": "elmahdi-lamine",
+      "firstName": "Elmahdi",
+      "lastName": "Lamine",
+      "title": "CEO",
+      "phone": "+372 555 121 47",
+      "email": "el@cdr.ee",
+      "linkedin": "",
+      "photo": "",
+      "qr": ""
+    }
+  ]
+}
