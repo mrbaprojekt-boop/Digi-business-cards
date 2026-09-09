@@ -15,7 +15,7 @@
 //  needed to display it.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, copyFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import qrcode from "./vendor/qrcode.cjs";
@@ -23,18 +23,29 @@ import qrcode from "./vendor/qrcode.cjs";
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const DATA = join(ROOT, "data", "employees.json");
 const OUT = join(ROOT, "docs");
+const ASSETS = join(ROOT, "assets");
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const THEME = {
-  lime: "#b4d335",   // CDR accent green (from the physical card)
-  ink: "#1a1a1a",    // primary text / black
+  lime: "#cde939",   // CDR brand green (from the logo lockup)
+  ink: "#111111",    // primary text / black
   paper: "#ffffff",  // card background
   muted: "#6b6b6b",  // labels, address
   line: "#e6e6e6",   // dividers
   pageBg: "#f4f4f2", // page background around the card
-  qrDark: "#1a1a1a",
+  qrDark: "#111111",
   qrLight: "#f0f0f0",
 };
+
+// Official logo: drop a file at assets/logo.svg (preferred) or assets/logo.png and
+// it is used verbatim inside the lime header block. If none is present, the wordmark
+// "CDR" is set in a heavy grotesque as a stand-in.
+function findLogo() {
+  for (const name of ["logo.svg", "logo.png", "logo.webp", "logo.jpg", "logo.jpeg"]) {
+    if (existsSync(join(ASSETS, name))) return name;
+  }
+  return null;
+}
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const esc = (s = "") =>
@@ -91,9 +102,12 @@ function vcard(emp, co) {
 }
 
 // ─── card page ───────────────────────────────────────────────────────────────
-function cardHTML(emp, co) {
+function cardHTML(emp, co, logoFile) {
   const T = THEME;
   const fullName = `${emp.firstName} ${emp.lastName}`.trim();
+  const logo = logoFile
+    ? `<img class="brand-img" src="./${esc(logoFile)}" alt="${esc(co.name)}">`
+    : `<span class="brand-text">${esc(co.name)}</span>`;
   const a = co.address || {};
   const addr = [a.street, a.locality, [a.postalCode, a.country].filter(Boolean).join(" ")]
     .filter(Boolean);
@@ -131,18 +145,24 @@ ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
     border:1px solid var(--line); border-radius:18px; overflow:hidden;
     box-shadow:0 20px 60px rgba(0,0,0,.08);
   }
-  .accent{height:8px;background:var(--lime)}
+  .brand{
+    background:var(--lime); padding:44px 32px 40px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .brand-img{display:block;width:auto;max-width:60%;height:auto}
+  .brand-text{
+    font-family:"Arial Black","Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-weight:900; font-size:76px; line-height:1; letter-spacing:-.02em; color:#000;
+  }
   .pad{padding:32px}
-  .logo{font-family:Anton,"Arial Narrow",Inter,sans-serif;font-weight:900;font-size:60px;line-height:.9;letter-spacing:.01em}
   .tagline{
-    margin-top:12px;padding-top:12px;border-top:1px solid var(--ink);
-    font-size:13px;font-weight:500;letter-spacing:.01em;color:var(--ink)
+    font-size:13px;font-weight:600;letter-spacing:.01em;color:var(--ink)
   }
   .unit{
-    display:inline-block;margin-top:14px;padding:4px 10px;border-radius:999px;
-    background:var(--lime);font-size:12px;font-weight:600
+    display:inline-block;margin-top:12px;padding:4px 10px;border-radius:999px;
+    background:var(--lime);font-size:12px;font-weight:700
   }
-  .who{margin-top:28px}
+  .who{margin-top:24px}
   .who h1{font-size:24px;font-weight:700;letter-spacing:-.01em}
   .who .title{color:var(--muted);font-size:15px;margin-top:2px}
   .rows{margin-top:24px;border-top:1px solid var(--line)}
@@ -169,14 +189,13 @@ ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
   .foot{padding:16px 32px;background:#fafafa;border-top:1px solid var(--line);
     font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
   .foot a{color:var(--muted)}
-  @media(max-width:400px){.pad{padding:24px}.logo{font-size:52px}}
+  @media(max-width:400px){.pad{padding:24px}.brand{padding:36px 24px}.brand-text{font-size:64px}}
 </style>
 </head>
 <body>
 <main class="card">
-  <div class="accent"></div>
+  <div class="brand">${logo}</div>
   <div class="pad">
-    <div class="logo">${esc(co.name)}</div>
     <div class="tagline">${esc(co.tagline)}</div>
     ${co.unit ? `<div class="unit">${esc(co.unit)}</div>` : ""}
 
@@ -284,6 +303,14 @@ function main() {
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, ".nojekyll"), "");
 
+  const logoFile = findLogo();
+  if (logoFile) {
+    copyFileSync(join(ASSETS, logoFile), join(OUT, logoFile));
+    console.log(`OK  logo: assets/${logoFile}`);
+  } else {
+    console.log(`..  no assets/logo.svg|png — using the "CDR" text wordmark as a stand-in`);
+  }
+
   const seen = new Set();
   const built = [];
   for (const raw of employees) {
@@ -295,7 +322,7 @@ function main() {
     }
     seen.add(emp.slug);
 
-    writeFileSync(join(OUT, `${emp.slug}.html`), cardHTML(emp, company));
+    writeFileSync(join(OUT, `${emp.slug}.html`), cardHTML(emp, company, logoFile));
     writeFileSync(join(OUT, `${emp.slug}.vcf`), vcard(emp, company));
     built.push(emp);
     console.log(`OK  ${emp.slug}.html  +  ${emp.slug}.vcf`);

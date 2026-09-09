@@ -19,6 +19,7 @@ Digi-business-cards/
 ├── Rebuild and open.bat     ← Windows: double-click to rebuild + open in browser
 ├── build.mjs                ← generator (do not edit unless changing design)
 ├── serve.mjs                ← local preview server
+├── assets/                  ← put the official logo here (logo.svg / logo.png)
 ├── vendor/qrcode.cjs        ← bundled QR-code library (no npm install needed)
 ├── package.json             ← npm scripts
 ├── docs/                    ← GENERATED output — this folder is the website you upload
@@ -228,15 +229,30 @@ it then behaves like an app icon that opens the card instantly.
 
 ---
 
-## 8. Restyle
+## 8. Logo
 
-Colors and fonts: the `THEME` object at the top of `build.mjs`.
+The card header is a lime block with the CDR logo.
+
+To use the **exact official logo file**: put it in the `assets/` folder as
+**`assets/logo.svg`** (best) or `assets/logo.png`, then rebuild. Use a file that is
+just the black "CDR" wordmark (transparent background works best — the lime block is
+already behind it). See `assets/README.md`.
+
+If `assets/` has no logo file, the header shows "CDR" set in a heavy sans-serif
+(Arial Black) as a stand-in.
+
+---
+
+## 9. Restyle
+
+Colors and fonts: the `THEME` object at the top of `build.mjs`
+(`lime` is the brand green; `ink` is the text black).
 Card layout: the `cardHTML()` function in `build.mjs`.
 Rebuild after any change.
 
 ---
 
-## 9. Working with Claude Code
+## 10. Working with Claude Code
 
 Ask in plain language and the `business-card` skill handles it:
 
