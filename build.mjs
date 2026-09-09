@@ -300,8 +300,8 @@ ${head}
     ${co.unit ? `<div class="unit">${esc(co.unit)}</div>` : ""}
 
     <div class="rows">
-      ${emp.phone ? `<a class="row" href="${attr(telHref(emp.phone))}"><span class="k">Phone</span><span class="v">${esc(emp.phone)}</span></a>` : ""}
-      ${emp.email ? `<a class="row" href="mailto:${attr(emp.email)}"><span class="k">Email</span><span class="v">${esc(emp.email)}</span></a>` : ""}
+      ${emp.phone ? `<a class="row" href="${attr(telHref(emp.phone))}"${embed ? ' target="_top"' : ""}><span class="k">Phone</span><span class="v">${esc(emp.phone)}</span></a>` : ""}
+      ${emp.email ? `<a class="row" href="mailto:${attr(emp.email)}"${embed ? ' target="_top"' : ""}><span class="k">Email</span><span class="v">${esc(emp.email)}</span></a>` : ""}
       ${co.website ? `<a class="row" href="${attr(co.website)}" target="_blank" rel="noopener noreferrer"><span class="k">Website</span><span class="v">${esc(co.websiteLabel || co.website)}</span></a>` : ""}
       ${addrOneLine ? `<a class="row" href="${attr(mapsHref(addrOneLine))}" target="_blank" rel="noopener noreferrer"><span class="k">Address (open in Maps)</span><span class="v">${addrLines.map(esc).join("<br>")}</span></a>` : ""}
     </div>
@@ -316,7 +316,7 @@ ${head}
     <div class="actions">
       <a class="btn primary" href="${attr(vcfHref)}" download="${attr(emp.slug)}.vcf">Save contact</a>
       ${shareUrl ? `<a class="btn ghost" id="sh" href="${attr(shareUrl)}">Share</a>` : ""}
-      <a class="btn lime" href="${attr(quotationHref)}"${quotationIsUrl ? ' target="_top" rel="noopener noreferrer"' : ""}>Request a quotation</a>
+      <a class="btn lime" href="${attr(quotationHref)}"${(quotationIsUrl || embed) ? ` target="_top"${quotationIsUrl ? ' rel="noopener noreferrer"' : ""}` : ""}>Request a quotation</a>
     </div>
   </div>
 
