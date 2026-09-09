@@ -8,8 +8,10 @@
     "websiteLabel": "cdr.ee",
     "baseUrl": "https://cdr.ee/business-cards",
     "urlSuffix": "",
-    "linkedin": "https://www.linkedin.com/company/c-d-r-technology-o%C3%BC/",
+    "linkedin": "https://www.linkedin.com/company/cdr-technology",
     "quotation": "",
+    "quotationEmail": "info@cdr.ee",
+    "quotationTrigger": "",
     "address": {
       "street": "Taevavärava tee 6b-24",
       "locality": "Lehmja küla, Rae vald, Harju maakond",

@@ -184,10 +184,18 @@ function cardHTML(emp, co, ctx, opts = {}) {
   const qrTarget = emp.qr || shareUrl || co.website || "";
   const vcfHref = "data:text/vcard;charset=utf-8," + encodeURIComponent(vcard(emp, co));
 
-  const quotation = co.quotation
-    ? co.quotation
-    : `mailto:${emp.email || co.email || ""}?subject=${encodeURIComponent("Quotation request")}` +
-      `&body=${encodeURIComponent("Hello,\n\nI would like to request a quotation.\n\nCompany:\nCountry:\nProduct / requirement:\nQuantity:\n\nThank you.")}`;
+  // Request a quotation:
+  //  - co.quotation set to a URL  → the button links there (opens on the top window)
+  //  - co.quotationTrigger set    → inside the Webflow iframe the click is forwarded to
+  //                                 the parent page, which .click()s that selector to
+  //                                 open the existing cdr.ee Quotation popup
+  //  - otherwise                  → a pre-filled email to co.quotationEmail
+  const qEmail = co.quotationEmail || emp.email || co.email || "";
+  const qMailto = `mailto:${qEmail}?subject=${encodeURIComponent("Quotation request")}` +
+    `&body=${encodeURIComponent("Hello,\n\nI would like to request a quotation.\n\nCompany:\nCountry:\nProduct / requirement:\nQuantity:\n\nThank you.")}`;
+  const quotationIsUrl = !!co.quotation && /^https?:/i.test(co.quotation);
+  const quotationHref = quotationIsUrl ? co.quotation : qMailto;
+  const quotationTrigger = (co.quotationTrigger || "").trim();
 
   const logo = ctx.logoFile
     ? `<img class="brand-img" src="./${esc(ctx.logoFile)}" alt="${attr(co.name)}">`
@@ -211,6 +219,11 @@ function cardHTML(emp, co, ctx, opts = {}) {
   const heightScript = embed ? `<script>(function(){var S=${JSON.stringify(emp.slug)};function h(){parent.postMessage({__cdrcard:S,h:document.documentElement.scrollHeight},"*")}addEventListener("load",h);addEventListener("resize",h);if(window.ResizeObserver){try{new ResizeObserver(h).observe(document.body)}catch(e){}}var im=document.images[0];if(im){im.addEventListener("load",h);im.addEventListener("error",h)}setTimeout(h,150);setTimeout(h,600);setTimeout(h,1800)})();</script>` : "";
 
   const shareScript = shareUrl ? `<script>(function(){var u=${JSON.stringify(shareUrl)},b=document.getElementById("sh");if(!b)return;var d={title:${JSON.stringify(fullName + " — " + (co.legalName || co.name))},text:${JSON.stringify(fullName + ", " + (emp.title || ""))},url:u};b.addEventListener("click",function(e){if(navigator.share){e.preventDefault();navigator.share(d).catch(function(){})}else if(navigator.clipboard&&navigator.clipboard.writeText){e.preventDefault();navigator.clipboard.writeText(u).then(function(){var t=b.textContent;b.textContent="Link copied";setTimeout(function(){b.textContent=t},1800)})}})})();</script>` : "";
+
+  // inside the Webflow iframe: forward the quotation click to the parent page
+  const quoteScript = (embed && quotationTrigger)
+    ? `<script>(function(){var b=document.getElementById("rq");if(b&&window.parent!==window){b.addEventListener("click",function(e){e.preventDefault();parent.postMessage({__cdrcard:${JSON.stringify(emp.slug)},quote:1},"*")})}})();</script>`
+    : "";
 
   const bodyRule = embed
     ? `body{margin:0;background:${T.paper};color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5}`
@@ -311,7 +324,7 @@ ${head}
     <div class="actions">
       <a class="btn primary" href="${attr(vcfHref)}" download="${attr(emp.slug)}.vcf">Save contact</a>
       ${shareUrl ? `<a class="btn ghost" id="sh" href="${attr(shareUrl)}">Share</a>` : ""}
-      <a class="btn lime" href="${attr(quotation)}"${co.quotation ? ' target="_blank" rel="noopener noreferrer"' : ""}>Request a quotation</a>
+      <a class="btn lime" id="rq" href="${attr(quotationHref)}"${quotationIsUrl ? ' target="_top" rel="noopener noreferrer"' : ""}>Request a quotation</a>
     </div>
   </div>
 
@@ -322,6 +335,7 @@ ${head}
 </main>
 ${heightScript}
 ${shareScript}
+${quoteScript}
 </body>
 </html>
 `;
@@ -334,6 +348,16 @@ function embedSnippet(emp, co, ctx) {
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;");
   const s = JSON.stringify(emp.slug);
+  const trigger = (co.quotationTrigger || "").trim();
+  const qEmail = co.quotationEmail || emp.email || co.email || "";
+  const quoteHandler = trigger
+    ? `
+    if (d.quote) {
+      var t = document.querySelector(${JSON.stringify(trigger)});
+      if (t) { t.click(); }
+      else { window.top.location.href = "mailto:${qEmail}?subject=Quotation%20request"; }
+    }`
+    : "";
   return `<!-- ${fullName} — C.D.R Technology digital business card -->
 <div style="width:100%;max-width:460px;margin:0 auto">
   <iframe id="cdrcard-${esc(emp.slug)}" title="${attr(fullName)} — business card" loading="lazy"
@@ -345,7 +369,8 @@ function embedSnippet(emp, co, ctx) {
   var f = document.getElementById("cdrcard-${esc(emp.slug)}");
   window.addEventListener("message", function(e){
     var d = e.data;
-    if (d && d.__cdrcard === ${s} && d.h) f.style.height = d.h + "px";
+    if (!d || d.__cdrcard !== ${s}) return;
+    if (d.h) f.style.height = d.h + "px";${quoteHandler}
   });
 })();
 </script>
