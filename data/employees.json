@@ -8,6 +8,7 @@
     "websiteLabel": "cdr.ee",
     "baseUrl": "https://cdr.ee/business-cards",
     "urlSuffix": "",
+    "assetBase": "https://mrbaprojekt-boop.github.io/Digi-business-cards",
     "linkedin": "https://www.linkedin.com/company/cdr-technology",
     "quotation": "",
     "quotationEmail": "info@cdr.ee",

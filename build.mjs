@@ -202,7 +202,10 @@ function cardHTML(emp, co, ctx, opts = {}) {
     ? `<img class="brand-img" src="./${esc(ctx.logoFile)}" alt="${attr(co.name)}">`
     : `<span class="brand-text">${esc(co.name)}</span>`;
 
-  const photoSrc = embed ? (ctx.photoDataUri || PHOTO_TOKEN) : `./${esc(emp.slug)}.webp`;
+  const assetBase = (co.assetBase || "").replace(/\/+$/, "");
+  const photoSrc = embed
+    ? (assetBase ? `${assetBase}/${emp.slug}.webp` : (ctx.photoDataUri || PHOTO_TOKEN))
+    : `./${esc(emp.slug)}.webp`;
   const initials = (emp.firstName[0] || "") + (emp.lastName[0] || "");
   const photo = emp.photo
     ? `<div class="photo">
