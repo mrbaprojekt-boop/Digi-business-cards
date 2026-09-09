@@ -186,12 +186,17 @@ function cardHTML(emp, co, ctx, opts = {}) {
 
   // Request a quotation — self-contained:
   //  - co.quotation set to a URL → the button links there (opens on the top window)
-  //  - otherwise                 → a pre-filled email to co.quotationEmail
+  //  - otherwise                 → the button opens a small "how do you want to send it"
+  //                                menu: email app (mailto) / Gmail / copy address
   const qEmail = co.quotationEmail || emp.email || co.email || "";
-  const qMailto = `mailto:${qEmail}?subject=${encodeURIComponent("Quotation request")}` +
-    `&body=${encodeURIComponent("Hello, I would like to request a quotation.")}`;
+  const qSubject = "Quotation request";
+  const qBody = "Hello, I would like to request a quotation.";
+  const qMailto = `mailto:${qEmail}?subject=${encodeURIComponent(qSubject)}&body=${encodeURIComponent(qBody)}`;
+  const qGmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(qEmail)}` +
+    `&su=${encodeURIComponent(qSubject)}&body=${encodeURIComponent(qBody)}`;
   const quotationIsUrl = !!co.quotation && /^https?:/i.test(co.quotation);
   const quotationHref = quotationIsUrl ? co.quotation : qMailto;
+  const quotationMenu = !quotationIsUrl;
 
   const logo = ctx.logoFile
     ? `<img class="brand-img" src="./${esc(ctx.logoFile)}" alt="${attr(co.name)}">`
@@ -215,6 +220,8 @@ function cardHTML(emp, co, ctx, opts = {}) {
   const heightScript = embed ? `<script>(function(){var S=${JSON.stringify(emp.slug)};function h(){parent.postMessage({__cdrcard:S,h:document.documentElement.scrollHeight},"*")}addEventListener("load",h);addEventListener("resize",h);if(window.ResizeObserver){try{new ResizeObserver(h).observe(document.body)}catch(e){}}var im=document.images[0];if(im){im.addEventListener("load",h);im.addEventListener("error",h)}setTimeout(h,150);setTimeout(h,600);setTimeout(h,1800)})();</script>` : "";
 
   const shareScript = shareUrl ? `<script>(function(){var u=${JSON.stringify(shareUrl)},b=document.getElementById("sh");if(!b)return;var d={title:${JSON.stringify(fullName + " — " + (co.legalName || co.name))},text:${JSON.stringify(fullName + ", " + (emp.title || ""))},url:u};b.addEventListener("click",function(e){if(navigator.share){e.preventDefault();navigator.share(d).catch(function(){})}else if(navigator.clipboard&&navigator.clipboard.writeText){e.preventDefault();navigator.clipboard.writeText(u).then(function(){var t=b.textContent;b.textContent="Link copied";setTimeout(function(){b.textContent=t},1800)})}})})();</script>` : "";
+
+  const quoteScript = quotationMenu ? `<script>(function(){var b=document.getElementById("rq"),m=document.getElementById("qm");if(!b||!m)return;function rs(){try{window.dispatchEvent(new Event("resize"))}catch(e){}}b.addEventListener("click",function(e){e.preventDefault();m.hidden=!m.hidden;rs()});m.querySelectorAll("[data-copy]").forEach(function(x){x.addEventListener("click",function(){var v=x.getAttribute("data-copy");if(navigator.clipboard)navigator.clipboard.writeText(v);var o=x.textContent;x.textContent="Copied: "+v;setTimeout(function(){x.textContent=o;m.hidden=true;rs()},1200)})});var c=m.querySelector(".qx");if(c)c.addEventListener("click",function(){m.hidden=true;rs()});m.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){setTimeout(function(){m.hidden=true;rs()},400)})})})();</script>` : "";
 
 
   const bodyRule = embed
@@ -281,6 +288,10 @@ ${head}
   .btn.ghost{background:#fff;color:var(--ink)}
   .btn.lime{background:var(--lime);color:#000;border-color:var(--lime);grid-column:1/-1}
   .btn:active{transform:translateY(1px)}
+  .qmenu{grid-column:1/-1;flex-direction:column;gap:8px;margin-top:2px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fafafa}
+  .qmenu:not([hidden]){display:flex}
+  .qmenu>*{display:block;width:100%;text-align:center;padding:12px;border-radius:10px;border:1.5px solid var(--ink);background:#fff;color:var(--ink);font:600 14px/1.2 inherit;text-decoration:none;cursor:pointer}
+  .qmenu .qx{border-color:var(--line);color:var(--muted);font-weight:500}
   .foot{padding:15px 30px;background:#fafafa;border-top:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:12px}
   .foot a{text-decoration:none}
   @media(max-width:360px){
@@ -316,7 +327,13 @@ ${head}
     <div class="actions">
       <a class="btn primary" href="${attr(vcfHref)}" download="${attr(emp.slug)}.vcf">Save contact</a>
       ${shareUrl ? `<a class="btn ghost" id="sh" href="${attr(shareUrl)}">Share</a>` : ""}
-      <a class="btn lime" href="${attr(quotationHref)}"${(quotationIsUrl || embed) ? ` target="_top"${quotationIsUrl ? ' rel="noopener noreferrer"' : ""}` : ""}>Request a quotation</a>
+      <a class="btn lime" id="rq" href="${attr(quotationHref)}"${(quotationIsUrl || (embed && !quotationMenu)) ? ` target="_top"${quotationIsUrl ? ' rel="noopener noreferrer"' : ""}` : ""}>Request a quotation</a>
+      ${quotationMenu ? `<div class="qmenu" id="qm" hidden>
+        <a href="${attr(qMailto)}" target="_top">Open in email app</a>
+        <a href="${attr(qGmail)}" target="_blank" rel="noopener noreferrer">Open in Gmail</a>
+        <button type="button" data-copy="${attr(qEmail)}">Copy ${esc(qEmail)}</button>
+        <button type="button" class="qx">Cancel</button>
+      </div>` : ""}
     </div>
   </div>
 
@@ -327,6 +344,7 @@ ${head}
 </main>
 ${heightScript}
 ${shareScript}
+${quoteScript}
 </body>
 </html>
 `;
