@@ -354,25 +354,32 @@ ${quoteScript}
 }
 
 // ─── Webflow embed ───────────────────────────────────────────────────────────
+// ONE <script> that builds the iframe and wires the auto-height listener in the
+// same block. Nothing to partially paste: it works whole or not at all. The card
+// HTML goes into f.srcdoc as a JS template literal (no HTML-entity encoding), so
+// backticks / ${ / </script> inside it are escaped for the literal + the parser.
 function embedSnippet(emp, co, ctx) {
   const fullName = `${emp.firstName} ${emp.lastName}`.trim();
-  const doc = mini(cardHTML(emp, co, ctx, { embed: true }))
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;");
+  const card = mini(cardHTML(emp, co, ctx, { embed: true }))
+    .replace(/\\/g, "\\\\")
+    .replace(/`/g, "\\`")
+    .replace(/\$\{/g, "\\${")
+    .replace(/<\/script>/g, "<\\/script>");
   const s = JSON.stringify(emp.slug);
-  // Generous initial height so the card is never clipped even if the resize
-  // script below is missing (e.g. an incomplete copy-paste). The script then
-  // trims it to the exact content height.
-  return `<!-- ${fullName} — C.D.R Technology digital business card -->
-<div style="width:100%;max-width:460px;margin:0 auto">
-  <iframe id="cdrcard-${esc(emp.slug)}" title="${attr(fullName)} — business card" loading="lazy"
-    scrolling="no" style="width:100%;border:0;display:block;overflow:hidden;height:2000px"
-    srcdoc="${doc}"></iframe>
-</div>
+  return `<!-- ${fullName} — C.D.R Technology digital business card. Paste this whole block into a Webflow HTML Embed. -->
 <script>
 (function(){
-  var f = document.getElementById("cdrcard-${esc(emp.slug)}");
-  if (!f) return;
+  var s = document.currentScript;
+  var w = document.createElement("div");
+  w.style.cssText = "width:100%;max-width:460px;margin:0 auto";
+  var f = document.createElement("iframe");
+  f.title = ${JSON.stringify(fullName + " — business card")};
+  f.setAttribute("scrolling", "no");
+  f.setAttribute("loading", "lazy");
+  f.style.cssText = "width:100%;border:0;display:block;height:2200px";
+  f.srcdoc = \`${card}\`;
+  w.appendChild(f);
+  s.parentNode.insertBefore(w, s);
   window.addEventListener("message", function(e){
     var d = e.data;
     if (d && d.__cdrcard === ${s} && d.h) f.style.height = d.h + "px";
