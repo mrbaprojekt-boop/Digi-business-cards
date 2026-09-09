@@ -356,10 +356,14 @@ function embedIndexHTML(list, co, ctx) {
   const T = THEME;
   const rows = list.map((e) => {
     const name = `${e.firstName} ${e.lastName}`.trim();
+    const full = embedSnippet(e, co, ctx[e.slug]);
+    const lite = full.replace(/src=&quot;data:image\/webp;base64,[^&]+&quot;/, `src=&quot;${PHOTO_TOKEN}&quot;`);
     return `<article>
   <header><b>${esc(name)}</b><span>${esc(e.title || "")}</span>
-    <button data-slug="${esc(e.slug)}">Copy embed code</button></header>
-  <textarea readonly id="t-${esc(e.slug)}">${esc(embedSnippet(e, co, ctx[e.slug]))}</textarea>
+    <button data-t="f-${esc(e.slug)}">Copy embed code</button>
+    ${lite !== full ? `<button class="alt" data-t="l-${esc(e.slug)}">Copy lite</button>` : ""}</header>
+  <textarea readonly id="f-${esc(e.slug)}">${esc(full)}</textarea>
+  ${lite !== full ? `<textarea readonly id="l-${esc(e.slug)}" hidden>${esc(lite)}</textarea>` : ""}
 </article>`;
   }).join("\n");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -377,6 +381,7 @@ function embedIndexHTML(list, co, ctx) {
   header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
   header b{font-size:15px}header span{color:${T.muted};font-size:13px;flex:1}
   button{padding:9px 15px;border:1px solid ${T.ink};background:${T.ink};color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+  button.alt{background:#fff;color:${T.ink}}
   button.ok{background:${T.lime};color:#000;border-color:${T.lime}}
   textarea{width:100%;height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;border:1px solid ${T.line};border-radius:8px;padding:10px;resize:vertical;background:#fafafa;color:#333;white-space:pre}
 </style></head><body><div class="wrap">
@@ -384,19 +389,18 @@ function embedIndexHTML(list, co, ctx) {
   <p class="lead">One HTML Embed per person (~13&nbsp;KB, well under Webflow's 50&nbsp;000-char limit).
   The card is an auto-resizing <code>&lt;iframe&gt;</code> — no inner scrollbar, height follows the content.</p>
   <div class="note">
-    The photo is already <b>embedded</b> in the code (optimised WebP, ~19&nbsp;KB) — nothing else to upload,
-    just paste and publish. <br>
-    If you would rather serve the photo from Webflow's CDN: upload <code>docs/&lt;slug&gt;.webp</code>
-    to <b>Webflow → Assets</b> and replace the <code>src="data:image/webp;base64,…"</code> value
-    with the Asset URL. Optional.
+    <b>Copy embed code</b> = the full card with the photo <b>embedded</b> (~34&nbsp;KB, nothing else to do).<br>
+    <b>Copy lite</b> = smaller (~14&nbsp;KB); upload <code>docs/&lt;slug&gt;.webp</code> to
+    <b>Webflow → Assets</b> and replace <code>${PHOTO_TOKEN}</code> in the code with the Asset URL.
   </div>
   ${rows}
 </div>
 <script>
-  document.querySelectorAll("button[data-slug]").forEach(function(b){
+  document.querySelectorAll("button[data-t]").forEach(function(b){
     b.addEventListener("click",function(){
-      var ta=document.getElementById("t-"+b.dataset.slug);
-      ta.select();navigator.clipboard.writeText(ta.value);
+      var ta=document.getElementById(b.dataset.t);
+      ta.hidden=false;ta.select();navigator.clipboard.writeText(ta.value);
+      if(ta.id[0]==="l")ta.hidden=true;
       var o=b.textContent;b.textContent="Copied \u2713";b.classList.add("ok");
       setTimeout(function(){b.textContent=o;b.classList.remove("ok")},1600);
     });
@@ -486,6 +490,12 @@ async function main() {
     writeFileSync(join(OUT, `${emp.slug}.vcf`), vcard(emp, company));
     const snip = embedSnippet(emp, company, ctx);
     writeFileSync(join(OUT, "embed", `${emp.slug}.txt`), snip);
+    // "lite" variant: photo served from Webflow Assets instead of inlined
+    const lite = snip.replace(
+      /src=&quot;data:image\/webp;base64,[^&]+&quot;/,
+      `src=&quot;${PHOTO_TOKEN}&quot;`
+    );
+    if (lite !== snip) writeFileSync(join(OUT, "embed", `${emp.slug}.lite.txt`), lite);
     const bytes = Buffer.byteLength(snip);
     console.log(`OK  ${emp.slug}: .html + .vcf + embed (${(bytes / 1024).toFixed(1)} KB${bytes > 50000 ? "  ⚠ OVER Webflow 50k Code Embed limit" : " — well under Webflow's 50k Code Embed limit"}) — photo: ${photoNote}`);
     built.push(emp);
