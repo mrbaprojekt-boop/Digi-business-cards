@@ -262,8 +262,9 @@ ${head}
   .row .k{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
   .row .v{font-size:15px;font-weight:600;word-break:break-word}
   .row:hover .v{text-decoration:underline}
-  .social{display:flex;gap:10px;padding:16px 0 2px}
-  .social a{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border:1px solid var(--line);border-radius:10px;color:var(--ink)}
+  .social{display:flex;flex-wrap:wrap;gap:8px;padding:16px 0 2px}
+  .social a{display:inline-flex;align-items:center;gap:7px;padding:7px 11px 7px 9px;border:1px solid var(--line);border-radius:999px;color:var(--ink);font-size:12px;font-weight:600;text-decoration:none}
+  .social a svg{flex:none;width:15px;height:15px}
   .social a:hover{background:var(--lime);border-color:var(--lime)}
   .qr-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:20px;text-align:center}
   .qr{width:190px;height:190px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;overflow:hidden}
@@ -301,8 +302,8 @@ ${head}
     </div>
 
     ${(emp.linkedin || co.linkedin) ? `<div class="social">
-      ${emp.linkedin ? `<a href="${attr(emp.linkedin)}" target="_blank" rel="noopener noreferrer" aria-label="${attr(fullName)} on LinkedIn">${LINKEDIN_ICON}</a>` : ""}
-      ${co.linkedin ? `<a href="${attr(co.linkedin)}" target="_blank" rel="noopener noreferrer" aria-label="${attr(co.legalName || co.name)} on LinkedIn">${LINKEDIN_ICON}</a>` : ""}
+      ${emp.linkedin ? `<a href="${attr(emp.linkedin)}" target="_blank" rel="noopener noreferrer" title="${attr(fullName)} on LinkedIn">${LINKEDIN_ICON}<span>Profile</span></a>` : ""}
+      ${co.linkedin ? `<a href="${attr(co.linkedin)}" target="_blank" rel="noopener noreferrer" title="${attr(co.legalName || co.name)} on LinkedIn">${LINKEDIN_ICON}<span>Company</span></a>` : ""}
     </div>` : ""}
 
     ${qr}
