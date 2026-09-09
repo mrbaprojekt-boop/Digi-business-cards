@@ -25,7 +25,10 @@ Digi-business-cards/
 ├── docs/                    ← GENERATED output — this folder is the website you upload
 │   ├── index.html               list of all cards
 │   ├── <slug>.html              one employee card (self-contained — opens from disk)
-│   └── <slug>.vcf               one contact file
+│   ├── <slug>.vcf               one contact file
+│   └── embed/                   paste-into-Webflow codes
+│       ├── index.html               open this, click "Copy embed code"
+│       └── <slug>.txt               the raw <iframe> snippet
 └── README.md
 ```
 
@@ -172,7 +175,29 @@ open `http://192.168.1.20:8080/`.
 
 ---
 
-## 6. Publish (upload to the cdr.ee server)
+## 6a. Publish via Webflow (embed) — recommended if the site is in Webflow
+
+Each build also produces a ready-to-paste embed for every person in **`docs/embed/`**.
+
+1. `npm run build`
+2. Open **`docs/embed/index.html`** in a browser → click **"Copy embed code"** for the person.
+   (Or open `docs/embed/<slug>.txt` and copy everything.)
+3. In Webflow: open that person's page → drag in an **HTML Embed** element →
+   paste the code → **Save** → **Publish** the page.
+
+The embed is a single self-contained `<iframe>` (~7 KB, under Webflow's 10 000-char
+limit). The card lives inside the iframe, so Webflow's styles never touch it. The QR
+code and web fonts load from a CDN when the page is live.
+
+Set `baseUrl` in `data/employees.json` to the **Webflow page URL pattern**, e.g.
+`https://cdr-group.webflow.io` or `https://cdr.ee` — whatever the published page address
+is — so the QR code and Share button point back to the right place. One `baseUrl` +
+`/<slug>.html` must equal the real page, so name the Webflow page slugs to match, **or**
+put the exact per-person page URL in each employee's `qr` field.
+
+---
+
+## 6b. Publish (upload the files to a static host / the cdr.ee server)
 
 The whole site is the **`docs/`** folder — plain static files, no server code.
 Publishing = copy the *contents* of `docs/` to a folder on the cdr.ee hosting.

@@ -102,8 +102,11 @@ function vcard(emp, co) {
 }
 
 // ─── card page ───────────────────────────────────────────────────────────────
-function cardHTML(emp, co, logoFile) {
+// opts.qr: "inline" (build-time SVG, default) or "client" (cdnjs script — smaller
+//          markup, used for the Webflow embed which has a ~10k character limit)
+function cardHTML(emp, co, logoFile, opts = {}) {
   const T = THEME;
+  const qrMode = opts.qr || "inline";
   const fullName = `${emp.firstName} ${emp.lastName}`.trim();
   const logo = logoFile
     ? `<img class="brand-img" src="./${esc(logoFile)}" alt="${esc(co.name)}">`
@@ -176,8 +179,8 @@ ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
   a.row:hover .v{color:#000;text-decoration:underline}
   .addr{padding:14px 0 0;font-size:14px;color:var(--muted)}
   .qr-wrap{margin-top:24px;display:flex;gap:16px;align-items:center}
-  .qr{width:104px;height:104px;flex:none;background:${T.qrLight};border-radius:10px;padding:8px}
-  .qr svg{display:block;width:100%;height:100%}
+  .qr{width:104px;height:104px;flex:none;background:${T.qrLight};border-radius:10px;padding:8px;overflow:hidden}
+  .qr svg,.qr img,.qr canvas{display:block!important;width:100%!important;height:100%!important;border:0}
   .qr-hint{font-size:12px;color:var(--muted)}
   .actions{display:flex;gap:10px;margin-top:26px;flex-wrap:wrap}
   .btn{
@@ -214,7 +217,7 @@ ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
     </div>
 
     ${qrTarget ? `<div class="qr-wrap">
-      <div class="qr">${qrSvg(qrTarget)}</div>
+      <div class="qr" id="qrbox">${qrMode === "inline" ? qrSvg(qrTarget) : ""}</div>
       <div class="qr-hint">Scan with a phone camera<br>to open this card</div>
     </div>` : ""}
 
@@ -230,6 +233,14 @@ ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
   </div>
 </main>
 
+${qrTarget && qrMode === "client" ? `<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  (function(){
+    var box = document.getElementById("qrbox");
+    function draw(){ try{ new QRCode(box, { text:${JSON.stringify(qrTarget)}, width:220, height:220, colorDark:"${T.qrDark}", colorLight:"${T.qrLight}", correctLevel:QRCode.CorrectLevel.M }); }catch(e){} }
+    if (window.QRCode) draw(); else { var s=document.querySelector('script[src*="qrcode"]'); if(s) s.addEventListener("load", draw); }
+  })();
+</script>` : ""}
 ${shareUrl ? `<script>
   (function(){
     var url = ${JSON.stringify(shareUrl)};
@@ -251,6 +262,69 @@ ${shareUrl ? `<script>
 </script>` : ""}
 </body>
 </html>
+`;
+}
+
+// ─── Webflow / CMS embed snippet ─────────────────────────────────────────────
+// A single self-contained <iframe> you paste into a Webflow "Code Embed" (HTML
+// Embed) block. The card lives inside the iframe, so its styles never clash with
+// the Webflow page. Uses the client-side QR build to stay under Webflow's ~10k
+// character limit for one embed.
+function embedSnippet(emp, co, logoFile) {
+  const fullName = `${emp.firstName} ${emp.lastName}`.trim();
+  // srcdoc attribute value: escape & first, then " — so the inner document is
+  // reproduced exactly after the browser decodes the attribute.
+  const doc = cardHTML(emp, co, logoFile, { qr: "client" })
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;");
+  return `<iframe title="${esc(fullName)} — ${esc(co.name)} business card" loading="lazy" ` +
+    `style="width:100%;max-width:460px;height:1000px;border:0;display:block;margin:0 auto" ` +
+    `srcdoc="${doc}"></iframe>\n`;
+}
+
+function embedIndexHTML(list, co, logoFile) {
+  const T = THEME;
+  const rows = list.map((e) => {
+    const name = `${e.firstName} ${e.lastName}`.trim();
+    return `<article>
+  <header><b>${esc(name)}</b><span>${esc(e.title || "")}</span>
+    <button data-slug="${esc(e.slug)}">Copy embed code</button></header>
+  <textarea readonly id="t-${esc(e.slug)}">${esc(embedSnippet(e, co, logoFile))}</textarea>
+</article>`;
+  }).join("\n");
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(co.name)} — Webflow embed codes</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Inter,Arial,sans-serif;background:${T.pageBg};color:${T.ink};padding:32px 20px;line-height:1.5}
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-size:22px;margin-bottom:6px}
+  p.lead{color:${T.muted};margin-bottom:24px}
+  article{background:#fff;border:1px solid ${T.line};border-radius:12px;padding:16px;margin-bottom:14px}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  header b{font-size:15px}header span{color:${T.muted};font-size:13px;flex:1}
+  button{padding:8px 14px;border:1px solid ${T.ink};background:${T.ink};color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+  button.ok{background:${T.lime};color:#000;border-color:${T.lime}}
+  textarea{width:100%;height:90px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;
+    border:1px solid ${T.line};border-radius:8px;padding:10px;resize:vertical;background:#fafafa;color:#333}
+</style></head><body><div class="wrap">
+  <h1>${esc(co.name)} — Webflow embed codes</h1>
+  <p class="lead">For each person: open their Webflow page, add an <b>HTML Embed</b> element,
+  and paste the code below. Publish the page. That's the whole card.</p>
+  ${rows}
+</div>
+<script>
+  document.querySelectorAll("button[data-slug]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var ta = document.getElementById("t-" + b.dataset.slug);
+      ta.select(); navigator.clipboard.writeText(ta.value);
+      var o = b.textContent; b.textContent = "Copied ✓"; b.classList.add("ok");
+      setTimeout(function(){ b.textContent = o; b.classList.remove("ok"); }, 1600);
+    });
+  });
+</script>
+</body></html>
 `;
 }
 
@@ -331,6 +405,19 @@ function main() {
 
   writeFileSync(join(OUT, "index.html"), indexHTML(built, company));
   console.log(`OK  index.html`);
+
+  // Webflow / CMS embed codes
+  const embedDir = join(OUT, "embed");
+  mkdirSync(embedDir, { recursive: true });
+  for (const emp of built) {
+    const snip = embedSnippet(emp, company, logoFile);
+    writeFileSync(join(embedDir, `${emp.slug}.txt`), snip);
+    const kb = (Buffer.byteLength(snip) / 1024).toFixed(1);
+    console.log(`OK  embed/${emp.slug}.txt  (${kb} KB${Buffer.byteLength(snip) > 10000 ? "  ⚠ over Webflow 10k limit" : ""})`);
+  }
+  writeFileSync(join(embedDir, "index.html"), embedIndexHTML(built, company, logoFile));
+  console.log(`OK  embed/index.html  ← open this, click "Copy embed code"`);
+
   console.log(`\nDone: ${built.length} card(s) in docs/`);
 }
 
