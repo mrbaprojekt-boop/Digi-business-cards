@@ -1,15 +1,18 @@
 {
   "company": {
     "name": "CDR",
+    "legalName": "C.D.R Technology OÜ",
     "tagline": "Creative | Development | Research",
     "unit": "GPU & GSE Equipment",
     "website": "https://cdr.ee",
     "websiteLabel": "cdr.ee",
     "baseUrl": "https://cdr.ee/business-cards",
     "urlSuffix": "",
+    "linkedin": "https://www.linkedin.com/company/c-d-r-technology-o%C3%BC/",
+    "quotation": "",
     "address": {
       "street": "Taevavärava tee 6b-24",
-      "locality": "Lehmja küla, Rae vald",
+      "locality": "Lehmja küla, Rae vald, Harju maakond",
       "postalCode": "75306",
       "country": "Estonia"
     }
@@ -23,7 +26,7 @@
       "phone": "+372 555 121 47",
       "email": "el@cdr.ee",
       "linkedin": "",
-      "photo": "",
+      "photo": "elmahdi-lamine.webp",
       "qr": ""
     }
   ]

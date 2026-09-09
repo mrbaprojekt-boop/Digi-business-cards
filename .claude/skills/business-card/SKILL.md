@@ -1,115 +1,67 @@
 ---
 name: business-card
-description: Generates CDR employee digital business cards from digital-business-cards/data/employees.json — one HTML page and one .vcf contact per person, plus a shared index.html. Handles adding/editing/removing an employee, changing company-wide data (address, website, unit), and restyling (colors, fonts). Use when asked to add/edit/remove an employee card, update company info on the cards, restyle the cards, or "rebuild the cards".
+description: Generates C.D.R Technology employee digital business cards from digital-business-cards/data/employees.json — a standalone HTML card, an optimised WebP photo, a .vcf, and a self-contained Webflow <iframe> embed per person. Handles adding/editing/removing an employee, company-wide data (address, LinkedIn, quotation), photos, and restyling. Use when asked to add/edit/remove a card, swap a photo, update company info, or "rebuild the cards".
 ---
 
-# business-card — CDR digital business cards
+# business-card — C.D.R Technology digital business cards
 
-Project folder: `digital-business-cards/`
+Project: `digital-business-cards/`  (repo `github.com/mrbaprojekt-boop/Digi-business-cards`, private)
 
 ```
-digital-business-cards/
-  data/employees.json   ← the ONLY source of data
-  build.mjs             ← generator (Node, no dependencies) — output goes to docs/
-  serve.mjs             ← local preview server (http://localhost:8080)
-  docs/                 ← GENERATED output, rebuilt every run; also what GitHub Pages serves — never hand-edit
-  README.md             ← user-facing instructions
+data/employees.json     the ONLY source of data
+assets/<slug>.src.png   photo source (~square) — build crops it to WebP
+assets/logo.svg|png     optional official logo
+build.mjs               generator (needs devDeps sharp + jsqr for photo + QR check)
+docs/                    GENERATED: <slug>.html, <slug>.webp, <slug>.vcf, index.html,
+                         embed/<slug>.txt (Webflow iframe), embed/index.html (copy page)
 ```
 
-## ⚠️ This workspace path contains a non-breaking space (U+00A0)
+## ⚠️ Workspace path has a non-breaking space (U+00A0)
 
-The working directory is `module 5 Создание продуктов с нуля`, where the space before
-«нуля» is U+00A0. Because of that:
-
-- **The Read / Write / Edit / Glob tools do not work here** — they silently miss the real
-  folder and can create a ghost folder with a normal space. **Do not use them for this project.**
-- Use **PowerShell / Bash / node** only.
-- In PowerShell, never type the Cyrillic path — derive it from `$PWD.Path` + `Join-Path`.
-- Call node by a relative ASCII path: `node "digital-business-cards/build.mjs"`.
+Read / Write / Edit / Glob **silently miss** the real folder here. Use **PowerShell /
+Bash / node only**. In PowerShell derive paths from `$PWD.Path` + `Join-Path`, never
+type the Cyrillic path. Run node by relative ASCII path: `node "digital-business-cards/build.mjs"`.
 
 ## Workflow
 
-1. Understand the request: add / edit / remove an employee, change company data, or restyle.
+1. Read data:
+   `Get-Content -Raw -LiteralPath (Join-Path $PWD.Path "digital-business-cards\data\employees.json")`
+2. Write the whole updated JSON back:
+   `Set-Content -LiteralPath (...) -Value $json -Encoding utf8`  (here-string).
+   For a new/changed photo, copy the image to `digital-business-cards\assets\<slug>.src.png`.
+3. Rebuild: `node "digital-business-cards/build.mjs"`
+   - It prints, per person: `QR <slug>: … decoded OK -> <url>` (fails the build if the
+     QR does not decode to the expected URL), photo sizes, and the embed KB
+     (must be under Webflow's 50 000-char limit).
+4. Verify + report: which files in `docs/` changed, the QR target, the embed size,
+   and remind the user to re-copy the embed from `docs/embed/<slug>.txt` into Webflow
+   (or re-upload `docs/`), then `git add -A && git commit && git push`.
 
-2. **Read the data:**
-   ```powershell
-   Get-Content -Raw -LiteralPath (Join-Path $PWD.Path "digital-business-cards\data\employees.json")
-   ```
+### Visual check (when restyling / new photo)
 
-3. **Write the data.** Build the full updated JSON and write it whole:
-   ```powershell
-   $json = @'
-   { ...the entire updated employees.json... }
-   '@
-   Set-Content -LiteralPath (Join-Path $PWD.Path "digital-business-cards\data\employees.json") -Value $json -Encoding utf8
-   ```
-   Change only what was asked, but the file has to be rewritten in full.
-   Design (colors/fonts): the `THEME` object and `cardHTML()` in `digital-business-cards/build.mjs`,
-   read/written the same way through PowerShell.
-
-4. **Rebuild:**
-   ```powershell
-   node "digital-business-cards/build.mjs"
-   ```
-   Expected: `OK <slug>.html + <slug>.vcf` per person, then `Done: N card(s) in docs/`.
-
-5. **Verify and report:**
-   ```powershell
-   Get-ChildItem (Join-Path $PWD.Path "digital-business-cards\docs") | Select Name
-   ```
-   Tell the user who was affected and which files in `docs/` changed. Remind them to
-   re-upload `docs/` to the cdr.ee server (folder `business-cards`), and optionally
-   `git add -A && git commit && git push` to back the change up on GitHub.
-
-### Visual check (optional / when restyling)
-
-`file://` is blocked in the browser — run the preview server, then drive Playwright:
-```powershell
-Start-Process node -ArgumentList "digital-business-cards/serve.mjs" -WindowStyle Hidden
 ```
-Then `mcp__playwright__browser_navigate` to `http://localhost:8080/<slug>.html`, screenshot,
-and when done: `Get-Process node | Stop-Process -Force`.
-
-## employees.json schema
-
-```jsonc
-{
-  "company": {
-    "name": "CDR",
-    "tagline": "Creative | Development | Research",
-    "unit": "GPU & GSE Equipment",       // badge under the tagline; "" removes it
-    "website": "https://cdr.ee",
-    "websiteLabel": "cdr.ee",            // how the link is shown
-    "baseUrl": "https://cdr.ee/business-cards", // where cards are published (uploaded to the cdr.ee server); QR + Share derive from it. "" → QR points to the file itself
-    "address": { "street": "...", "locality": "...", "postalCode": "...", "country": "..." }
-  },
-  "employees": [
-    {
-      "slug": "elmahdi-lamine",   // file names <slug>.html / <slug>.vcf. Latin, no spaces. Omit → generated from name
-      "firstName": "Elmahdi",
-      "lastName": "Lamine",
-      "title": "CEO",
-      "phone": "+372 555 121 47",
-      "email": "el@cdr.ee",
-      "linkedin": "",              // full URL or "" (row shown only when filled)
-      "photo": "",                 // reserved
-      "qr": ""                     // "" → QR to baseUrl/<slug>.html; otherwise any URL (Calendly, etc.)
-    }
-  ]
-}
+node "digital-business-cards/serve.mjs" 8080   (background)
 ```
+Playwright → `http://localhost:8080/<slug>.html` and, for the embed, a tiny test page
+that includes `docs/embed/<slug>.txt`. Check widths 320 / 375 / 390 / 430. Stop node after.
+
+## Data model (employees.json)
+
+`company`: `name` (wordmark), `legalName` ("C.D.R Technology OÜ"), `tagline`, `unit`,
+`website`, `websiteLabel`, `baseUrl`, `urlSuffix` (`""` = clean Webflow URLs),
+`linkedin` (company), `quotation` (`""` → button becomes a pre-filled email to the
+person, subject "Quotation request"), `address {street, locality, postalCode, country}`.
+
+`employees[]`: `slug` (URL segment + filenames; don't change once shared),
+`firstName`, `lastName`, `title`, `phone`, `email`, `linkedin` (personal — only if an
+exact URL was given), `photo` (truthy → uses `assets/<slug>.src.png`), `qr` (`""` →
+the card's own URL = `baseUrl` + `/` + `slug` + `urlSuffix`).
 
 ## Rules
 
-- Only edit `data/employees.json` and (for design) `build.mjs`. `docs/` is generated.
-- Do not change an existing person's `slug` without reason — external links and QR codes depend on it.
-- `slug` is unique; a duplicate is skipped with a warning during build.
-- Always rebuild after any edit and confirm the build had no errors.
-- No Read/Write/Edit/Glob — PowerShell/Bash/node only (see the ⚠️ block above).
-
-## Quick recipes
-
-- **Add an employee** — new object in `employees`, rebuild.
-- **Employee left** — remove the object from `employees`, rebuild (their files leave `docs/`).
-- **Company address/website/unit changed** — edit `company`, rebuild (all cards update).
-- **Different accent color / font** — `THEME` in `build.mjs`, rebuild, show a screenshot.
+- Edit only `data/employees.json`, `assets/*`, and (for design) `build.mjs`.
+- `slug` unique and stable; the QR encodes `baseUrl/<slug><urlSuffix>`.
+- Always rebuild; the build self-verifies the QR — do not ship if it fails.
+- The Webflow embed is one self-contained `<iframe srcdoc>` with the photo inlined as
+  WebP and an auto-height postMessage script. Keep it under 50 000 characters.
+- No Read/Write/Edit/Glob in this project — PowerShell/Bash/node only.

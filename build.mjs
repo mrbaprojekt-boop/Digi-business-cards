@@ -1,23 +1,25 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  CDR — digital business card generator
+//  C.D.R Technology — digital business card generator
 //
-//  Run:     node build.mjs   (or: npm run build)
-//  Input:   data/employees.json
-//  Output:  docs/<slug>.html   — the employee's card (fully self-contained,
-//                                works when opened directly from disk)
-//           docs/<slug>.vcf    — contact file for phones ("Save contact")
-//           docs/index.html    — list of all cards
-//           docs/.nojekyll     — harmless; only matters if hosted on GitHub Pages
+//  Run:     node build.mjs      (npm run build)
+//  Input:   data/employees.json           + assets/logo.svg|png (optional)
+//                                          + assets/<slug>.src.png (photo source)
+//  Output:  docs/<slug>.html      standalone card (self-contained)
+//           docs/<slug>.webp      optimised photo (from assets/<slug>.src.png)
+//           docs/<slug>.vcf       contact file
+//           docs/index.html       list of all cards
+//           docs/embed/<slug>.txt paste-into-Webflow <iframe> (auto-height, minified)
+//           docs/embed/index.html copy-button helper page
 //
-//  Design tokens (colors / fonts) live in the THEME object below.
-//  Card markup lives in the cardHTML() function.
-//  The QR code is generated here at build time and inlined as SVG — no internet
-//  needed to display it.
+//  Design tokens: THEME.  Card markup: cardHTML().  QR: qrSvg() (build-time SVG).
+//  sharp + jsqr (devDependencies) are used to (re)encode the photo and to verify
+//  that the generated QR really decodes to the right URL. If they are missing the
+//  build still runs (photo reuse / QR check skipped with a warning).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, copyFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, basename } from "node:path";
 import qrcode from "./vendor/qrcode.cjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -25,69 +27,128 @@ const DATA = join(ROOT, "data", "employees.json");
 const OUT = join(ROOT, "docs");
 const ASSETS = join(ROOT, "assets");
 
+let sharp = null, jsQR = null;
+try { sharp = (await import("sharp")).default; } catch { /* optional */ }
+try { jsQR = (await import("jsqr")).default; } catch { /* optional */ }
+
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const THEME = {
-  lime: "#d1ec3a",   // CDR brand green (from the logo lockup)
-  ink: "#111111",    // primary text / black
-  paper: "#ffffff",  // card background
-  muted: "#6b6b6b",  // labels, address
-  line: "#e6e6e6",   // dividers
-  pageBg: "#f4f4f2", // page background around the card
-  qrDark: "#111111",
-  qrLight: "#f0f0f0",
+  lime: "#d1ec3a",
+  ink: "#111111",
+  paper: "#ffffff",
+  muted: "#6b6b6b",
+  line: "#e7e7e7",
+  pageBg: "#f4f4f2",
 };
-
-// Official logo: drop a file at assets/logo.svg (preferred) or assets/logo.png and
-// it is used verbatim inside the lime header block. If none is present, the wordmark
-// "CDR" is set in a heavy grotesque as a stand-in.
-function findLogo() {
-  for (const name of ["logo.svg", "logo.png", "logo.webp", "logo.jpg", "logo.jpeg"]) {
-    if (existsSync(join(ASSETS, name))) return name;
-  }
-  return null;
-}
+const PHOTO_TOKEN = "PASTE_WEBFLOW_ASSET_URL_HERE";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const esc = (s = "") =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
-// escape a value for a .vcf file (vCard 3.0)
+const attr = (s = "") => esc(s).replace(/'/g, "&#39;");
 const vc = (s = "") =>
   String(s).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
-
 const telHref = (p = "") => "tel:" + String(p).replace(/[^\d+]/g, "");
+const mapsHref = (q) => "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q);
 
 function slugify(s) {
-  return String(s)
-    .toLowerCase()
-    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  return String(s).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-// build-time QR code → inline SVG string
-function qrSvg(text) {
+function findLogo() {
+  for (const n of ["logo.svg", "logo.png", "logo.webp", "logo.jpg", "logo.jpeg"])
+    if (existsSync(join(ASSETS, n))) return n;
+  return null;
+}
+
+// collapse whitespace for the embed's srcdoc (safe here: no <pre>, scripts are single-line)
+const mini = (s) => s
+  .replace(/<!--[\s\S]*?-->/g, "")
+  .replace(/\n\s*/g, "")
+  .replace(/\s{2,}/g, " ")
+  .trim();
+
+// ─── QR → compact inline SVG (quiet zone = 4 modules, #111 on #fff) ───────────
+function qrSvg(text, px = 190, quiet = 4) {
   const qr = qrcode(0, "M");
   qr.addData(text);
   qr.make();
   const n = qr.getModuleCount();
+  const dim = n + quiet * 2;
   let d = "";
-  for (let r = 0; r < n; r++)
-    for (let c = 0; c < n; c++)
-      if (qr.isDark(r, c)) d += `M${c},${r}h1v1h-1z`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges" role="img" aria-label="QR code">` +
-    `<rect width="${n}" height="${n}" fill="${THEME.qrLight}"/><path d="${d}" fill="${THEME.qrDark}"/></svg>`;
+  for (let r = 0; r < n; r++) {
+    let run = 0;
+    for (let c = 0; c < n; c++) {
+      if (qr.isDark(r, c)) { run++; continue; }
+      if (run) { d += `M${c - run + quiet} ${r + quiet}h${run}v1h-${run}z`; run = 0; }
+    }
+    if (run) d += `M${n - run + quiet} ${r + quiet}h${run}v1h-${run}z`;
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dim} ${dim}" width="${px}" height="${px}" shape-rendering="crispEdges" role="img" aria-label="QR code linking to ${esc(text)}"><rect width="${dim}" height="${dim}" fill="#fff"/><path d="${d}" fill="#111"/></svg>`;
+  return { svg, modules: n, dim };
+}
+
+async function verifyQr(svg, expected) {
+  if (!sharp || !jsQR) return "skipped (sharp/jsqr not installed)";
+  const { data, info } = await sharp(Buffer.from(svg), { density: 300 })
+    .resize(360, 360, { fit: "contain", background: "#fff" })
+    .flatten({ background: "#fff" })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const res = jsQR(new Uint8ClampedArray(data), info.width, info.height);
+  if (!res) throw new Error("QR VERIFY FAILED — the generated QR did not decode");
+  if (res.data !== expected)
+    throw new Error(`QR VERIFY FAILED — decoded "${res.data}" but expected "${expected}"`);
+  return `decoded OK -> ${res.data}`;
+}
+
+// ─── photo → optimised WebP (file for standalone/Assets, data-URI for the embed) ──
+async function makePhoto(slug) {
+  const src = join(ASSETS, `${slug}.src.png`);
+  const dest = join(OUT, `${slug}.webp`);
+  if (!existsSync(src)) {
+    const prev = join(ASSETS, `${slug}.webp`);
+    if (existsSync(prev) && !sharp) {
+      copyFileSync(prev, dest);
+      return { ok: true, note: "reused assets/*.webp (no source, sharp not installed)", dataUri: null };
+    }
+    return { ok: false, note: `no assets/${slug}.src.png`, dataUri: null };
+  }
+  if (!sharp) {
+    const prev = join(ASSETS, `${slug}.webp`);
+    if (existsSync(prev)) { copyFileSync(prev, dest); return { ok: true, note: "reused assets/*.webp (sharp not installed)", dataUri: null }; }
+    return { ok: false, note: "sharp not installed and no prebuilt webp", dataUri: null };
+  }
+  // full-size file (standalone card + optional Webflow Assets upload)
+  const info = await sharp(src)
+    .resize({ width: 1200, height: 960, fit: "cover", position: "top" })
+    .webp({ quality: 80, effort: 6 })
+    .toFile(dest);
+  copyFileSync(dest, join(ASSETS, `${slug}.webp`));
+  // smaller build for inlining into the self-contained embed
+  const small = await sharp(src)
+    .resize({ width: 900, height: 720, fit: "cover", position: "top" })
+    .webp({ quality: 74, effort: 6 })
+    .toBuffer();
+  return {
+    ok: true,
+    note: `file ${info.width}x${info.height} ${(info.size / 1024).toFixed(1)} KB; embed inline 900x720 ${(small.length / 1024).toFixed(1)} KB`,
+    dataUri: `data:image/webp;base64,${small.toString("base64")}`,
+  };
 }
 
 // ─── vCard ───────────────────────────────────────────────────────────────────
 function vcard(emp, co) {
   const a = co.address || {};
+  const org = [co.legalName || co.name, co.unit].filter(Boolean).map(vc).join(";");
   const lines = [
     "BEGIN:VCARD",
     "VERSION:3.0",
     `N:${vc(emp.lastName)};${vc(emp.firstName)};;;`,
     `FN:${vc(`${emp.firstName} ${emp.lastName}`.trim())}`,
-    `ORG:${vc(co.name)}${co.unit ? ";" + vc(co.unit) : ""}`,
+    `ORG:${org}`,
     emp.title ? `TITLE:${vc(emp.title)}` : "",
     emp.phone ? `TEL;TYPE=WORK,VOICE:${vc(emp.phone)}` : "",
     emp.email ? `EMAIL;TYPE=WORK:${vc(emp.email)}` : "",
@@ -101,228 +162,242 @@ function vcard(emp, co) {
   return lines.filter(Boolean).join("\r\n") + "\r\n";
 }
 
+// ─── icons ───────────────────────────────────────────────────────────────────
+const LINKEDIN_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.07 2.07 0 1 1 0-4.14 2.07 2.07 0 0 1 0 4.14zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/></svg>`;
+
 // ─── card page ───────────────────────────────────────────────────────────────
-// opts.qr: "inline" (build-time SVG, default) or "client" (cdnjs script — smaller
-//          markup, used for the Webflow embed which has a ~10k character limit)
-function cardHTML(emp, co, logoFile, opts = {}) {
+function cardHTML(emp, co, ctx, opts = {}) {
   const T = THEME;
-  const qrMode = opts.qr || "inline";
+  const embed = !!opts.embed;
   const fullName = `${emp.firstName} ${emp.lastName}`.trim();
-  const logo = logoFile
-    ? `<img class="brand-img" src="./${esc(logoFile)}" alt="${esc(co.name)}">`
-    : `<span class="brand-text">${esc(co.name)}</span>`;
   const a = co.address || {};
-  const addr = [a.street, a.locality, [a.postalCode, a.country].filter(Boolean).join(" ")]
-    .filter(Boolean);
+  const addrLines = [
+    a.street,
+    [a.locality].filter(Boolean).join(""),
+    [a.postalCode, a.country].filter(Boolean).join(" "),
+  ].filter(Boolean);
+  const addrOneLine = [a.street, a.locality, a.postalCode, a.country].filter(Boolean).join(", ");
+
   const base = (co.baseUrl || "").replace(/\/+$/, "");
-  const suffix = co.urlSuffix ?? ".html";   // "" for Webflow-style clean URLs
+  const suffix = co.urlSuffix ?? ".html";
   const shareUrl = base ? `${base}/${emp.slug}${suffix}` : "";
   const qrTarget = emp.qr || shareUrl || co.website || "";
   const vcfHref = "data:text/vcard;charset=utf-8," + encodeURIComponent(vcard(emp, co));
 
+  const quotation = co.quotation
+    ? co.quotation
+    : `mailto:${emp.email || co.email || ""}?subject=${encodeURIComponent("Quotation request")}` +
+      `&body=${encodeURIComponent("Hello,\n\nI would like to request a quotation.\n\nCompany:\nCountry:\nProduct / requirement:\nQuantity:\n\nThank you.")}`;
+
+  const logo = ctx.logoFile
+    ? `<img class="brand-img" src="./${esc(ctx.logoFile)}" alt="${attr(co.name)}">`
+    : `<span class="brand-text">${esc(co.name)}</span>`;
+
+  const photoSrc = embed ? (ctx.photoDataUri || PHOTO_TOKEN) : `./${esc(emp.slug)}.webp`;
+  const initials = (emp.firstName[0] || "") + (emp.lastName[0] || "");
+  const photo = emp.photo
+    ? `<div class="photo">
+      <img src="${attr(photoSrc)}" alt="${attr(fullName)}" loading="lazy" decoding="async"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div class="photo-fb" style="display:none">${esc(initials)}</div>
+    </div>`
+    : "";
+
+  const qr = qrTarget ? `<div class="qr-wrap">
+      <div class="qr">${ctx.qr.svg}</div>
+      <div class="qr-hint">Scan to open this card</div>
+    </div>` : "";
+
+  const heightScript = embed ? `<script>(function(){var S=${JSON.stringify(emp.slug)};function h(){parent.postMessage({__cdrcard:S,h:document.documentElement.scrollHeight},"*")}addEventListener("load",h);addEventListener("resize",h);if(window.ResizeObserver){try{new ResizeObserver(h).observe(document.body)}catch(e){}}var im=document.images[0];if(im){im.addEventListener("load",h);im.addEventListener("error",h)}setTimeout(h,150);setTimeout(h,600);setTimeout(h,1800)})();</script>` : "";
+
+  const shareScript = shareUrl ? `<script>(function(){var u=${JSON.stringify(shareUrl)},b=document.getElementById("sh");if(!b)return;var d={title:${JSON.stringify(fullName + " — " + (co.legalName || co.name))},text:${JSON.stringify(fullName + ", " + (emp.title || ""))},url:u};b.addEventListener("click",function(e){if(navigator.share){e.preventDefault();navigator.share(d).catch(function(){})}else if(navigator.clipboard&&navigator.clipboard.writeText){e.preventDefault();navigator.clipboard.writeText(u).then(function(){var t=b.textContent;b.textContent="Link copied";setTimeout(function(){b.textContent=t},1800)})}})})();</script>` : "";
+
+  const bodyRule = embed
+    ? `body{margin:0;background:${T.paper};color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5}`
+    : `body{margin:0;background:${T.pageBg};color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}`;
+  const cardRule = embed
+    ? `.card{width:100%;max-width:460px;margin:0 auto;background:${T.paper};overflow:hidden}`
+    : `.card{width:100%;max-width:420px;background:${T.paper};border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.08)}`;
+
+  const head = embed
+    ? `<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">`
+    : `<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(fullName)} — ${esc(co.legalName || co.name)}</title>
+<meta name="description" content="${attr(fullName)}, ${attr(emp.title)} — ${attr(co.legalName || co.name)}. ${attr(co.unit || "")}">
+${shareUrl ? `<meta property="og:title" content="${attr(fullName + " — " + (co.legalName || co.name))}">
+<meta property="og:description" content="${attr((emp.title || "") + " · " + (co.unit || co.tagline))}">
+<meta property="og:type" content="profile">
+<meta property="og:url" content="${attr(shareUrl)}">` : ""}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">`;
+
   return `<!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(fullName)} — ${esc(co.name)}</title>
-<meta name="description" content="${esc(fullName)}, ${esc(emp.title)} at ${esc(co.name)}. ${esc(co.tagline)}">
-<meta property="og:title" content="${esc(fullName)} — ${esc(co.name)}">
-<meta property="og:description" content="${esc(emp.title)} · ${esc(co.tagline)}">
-${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+${head}
 <style>
-  :root{
-    --lime:${T.lime}; --ink:${T.ink}; --paper:${T.paper};
-    --muted:${T.muted}; --line:${T.line}; --page:${T.pageBg};
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{
-    font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-    background:var(--page); color:var(--ink);
-    min-height:100vh; display:flex; align-items:center; justify-content:center;
-    padding:24px; line-height:1.5;
-  }
-  .card{
-    width:100%; max-width:420px; background:var(--paper);
-    border:1px solid var(--line); border-radius:18px; overflow:hidden;
-    box-shadow:0 20px 60px rgba(0,0,0,.08);
-  }
-  .brand{
-    background:var(--lime); padding:48px 32px 44px;
-    display:flex; align-items:center; justify-content:center;
-  }
-  .brand-img{display:block;width:auto;max-width:64%;height:auto}
-  .brand-text{
-    font-family:"Bebas Neue","Oswald","Arial Narrow",sans-serif;
-    font-weight:400; font-size:132px; line-height:.8; letter-spacing:.01em; color:#000;
-  }
-  .pad{padding:32px}
-  .tagline{
-    text-align:center;
-    font-size:13px;font-weight:600;letter-spacing:.01em;color:var(--ink)
-  }
-  .unit{
-    display:block;width:fit-content;margin:12px auto 0;padding:4px 10px;border-radius:999px;
-    background:var(--lime);font-size:12px;font-weight:700
-  }
-  .who{margin-top:24px}
-  .who h1{font-size:24px;font-weight:700;letter-spacing:-.01em}
-  .who .title{color:var(--muted);font-size:15px;margin-top:2px}
-  .rows{margin-top:24px;border-top:1px solid var(--line)}
-  .row{
-    display:flex;flex-direction:column;gap:2px;
-    padding:14px 0;border-bottom:1px solid var(--line);text-decoration:none;color:inherit
-  }
-  .row .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-  .row .v{font-size:16px;font-weight:600;word-break:break-word}
-  a.row:hover .v{color:#000;text-decoration:underline}
-  .addr{padding:14px 0 0;font-size:14px;color:var(--muted)}
-  .qr-wrap{margin-top:24px;display:flex;gap:16px;align-items:center}
-  .qr{width:104px;height:104px;flex:none;background:${T.qrLight};border-radius:10px;padding:8px;overflow:hidden}
-  .qr svg,.qr img,.qr canvas{display:block!important;width:100%!important;height:100%!important;border:0}
+  :root{--lime:${T.lime};--ink:${T.ink};--muted:${T.muted};--line:${T.line}}
+  *{box-sizing:border-box}
+  ${bodyRule}
+  ${cardRule}
+  img{max-width:100%;display:block}
+  a{color:inherit}
+  .brand{background:var(--lime);padding:26px 30px;display:flex;align-items:center;justify-content:center}
+  .brand-img{width:auto;max-width:52%;height:auto}
+  .brand-text{font-family:"Bebas Neue","Arial Narrow",sans-serif;font-weight:400;font-size:64px;line-height:.8;letter-spacing:.02em;color:#000}
+  .photo{position:relative;width:100%;aspect-ratio:5/4;background:#e9e9e9}
+  .photo img{width:100%;height:100%;object-fit:cover;object-position:center 18%}
+  .photo-fb{width:100%;height:100%;align-items:center;justify-content:center;font-family:"Bebas Neue",sans-serif;font-size:80px;color:#000;background:var(--lime)}
+  .pad{padding:26px 30px 30px}
+  .name{font-size:23px;font-weight:700;letter-spacing:-.01em}
+  .role{color:var(--muted);font-size:15px;margin-top:2px}
+  .org{font-size:14px;font-weight:600;margin-top:10px}
+  .unit{display:inline-block;margin-top:10px;padding:5px 11px;border-radius:999px;background:var(--lime);font-size:12px;font-weight:700}
+  .rows{margin-top:20px;border-top:1px solid var(--line)}
+  .row{display:flex;flex-direction:column;gap:2px;padding:13px 0;border-bottom:1px solid var(--line);text-decoration:none}
+  .row .k{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+  .row .v{font-size:15px;font-weight:600;word-break:break-word}
+  .row:hover .v{text-decoration:underline}
+  .social{display:flex;gap:10px;padding:16px 0 2px}
+  .social a{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border:1px solid var(--line);border-radius:10px;color:var(--ink)}
+  .social a:hover{background:var(--lime);border-color:var(--lime)}
+  .qr-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:20px;text-align:center}
+  .qr{width:190px;height:190px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;overflow:hidden}
+  .qr svg{width:100%;height:100%;display:block}
   .qr-hint{font-size:12px;color:var(--muted)}
-  .actions{display:flex;gap:10px;margin-top:26px;flex-wrap:wrap}
-  .btn{
-    flex:1 1 140px;text-align:center;padding:13px 16px;border-radius:12px;
-    font-size:14px;font-weight:600;text-decoration:none;cursor:pointer;border:1px solid var(--ink)
-  }
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
+  .btn{display:flex;align-items:center;justify-content:center;text-align:center;min-height:52px;padding:12px 14px;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;border:1.5px solid var(--ink)}
   .btn.primary{background:var(--ink);color:#fff}
-  .btn.ghost{background:transparent;color:var(--ink)}
+  .btn.lime{background:var(--lime);color:#000;border-color:var(--lime)}
+  .btn.ghost{background:#fff;color:var(--ink);grid-column:1/-1}
   .btn:active{transform:translateY(1px)}
-  .foot{padding:16px 32px;background:#fafafa;border-top:1px solid var(--line);
-    font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
-  .foot a{color:var(--muted)}
-  @media(max-width:400px){.pad{padding:24px}.brand{padding:40px 24px}.brand-text{font-size:108px}}
+  .foot{padding:15px 30px;background:#fafafa;border-top:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:12px}
+  .foot a{text-decoration:none}
+  @media(max-width:360px){
+    .pad{padding:22px 20px 26px}.brand{padding:22px}.brand-text{font-size:54px}
+    .actions{grid-template-columns:1fr}.btn.ghost{grid-column:auto}
+  }
 </style>
 </head>
 <body>
 <main class="card">
   <div class="brand">${logo}</div>
+  ${photo}
   <div class="pad">
-    <div class="tagline">${esc(co.tagline)}</div>
+    <div class="name">${esc(fullName)}</div>
+    ${emp.title ? `<div class="role">${esc(emp.title)}</div>` : ""}
+    ${co.legalName ? `<div class="org">${esc(co.legalName)}</div>` : ""}
     ${co.unit ? `<div class="unit">${esc(co.unit)}</div>` : ""}
 
-    <div class="who">
-      <h1>${esc(fullName)}</h1>
-      ${emp.title ? `<div class="title">${esc(emp.title)}</div>` : ""}
-    </div>
-
     <div class="rows">
-      ${emp.phone ? `<a class="row" href="${esc(telHref(emp.phone))}"><span class="k">Phone</span><span class="v">${esc(emp.phone)}</span></a>` : ""}
-      ${emp.email ? `<a class="row" href="mailto:${esc(emp.email)}"><span class="k">Email</span><span class="v">${esc(emp.email)}</span></a>` : ""}
-      ${co.website ? `<a class="row" href="${esc(co.website)}" target="_blank" rel="noopener"><span class="k">Web</span><span class="v">${esc(co.websiteLabel || co.website)}</span></a>` : ""}
-      ${emp.linkedin ? `<a class="row" href="${esc(emp.linkedin)}" target="_blank" rel="noopener"><span class="k">LinkedIn</span><span class="v">${esc(emp.linkedin.replace(/^https?:\/\/(www\.)?/, ""))}</span></a>` : ""}
-      ${addr.length ? `<div class="addr">${addr.map(esc).join("<br>")}</div>` : ""}
+      ${emp.phone ? `<a class="row" href="${attr(telHref(emp.phone))}"><span class="k">Phone</span><span class="v">${esc(emp.phone)}</span></a>` : ""}
+      ${emp.email ? `<a class="row" href="mailto:${attr(emp.email)}"><span class="k">Email</span><span class="v">${esc(emp.email)}</span></a>` : ""}
+      ${co.website ? `<a class="row" href="${attr(co.website)}" target="_blank" rel="noopener noreferrer"><span class="k">Website</span><span class="v">${esc(co.websiteLabel || co.website)}</span></a>` : ""}
+      ${addrOneLine ? `<a class="row" href="${attr(mapsHref(addrOneLine))}" target="_blank" rel="noopener noreferrer"><span class="k">Address (open in Maps)</span><span class="v">${addrLines.map(esc).join("<br>")}</span></a>` : ""}
     </div>
 
-    ${qrTarget ? `<div class="qr-wrap">
-      <div class="qr" id="qrbox">${qrMode === "inline" ? qrSvg(qrTarget) : ""}</div>
-      <div class="qr-hint">Scan with a phone camera<br>to open this card</div>
+    ${(emp.linkedin || co.linkedin) ? `<div class="social">
+      ${emp.linkedin ? `<a href="${attr(emp.linkedin)}" target="_blank" rel="noopener noreferrer" aria-label="${attr(fullName)} on LinkedIn">${LINKEDIN_ICON}</a>` : ""}
+      ${co.linkedin ? `<a href="${attr(co.linkedin)}" target="_blank" rel="noopener noreferrer" aria-label="${attr(co.legalName || co.name)} on LinkedIn">${LINKEDIN_ICON}</a>` : ""}
     </div>` : ""}
 
+    ${qr}
+
     <div class="actions">
-      <a class="btn primary" href="${vcfHref}" download="${esc(emp.slug)}.vcf">Save contact</a>
-      ${shareUrl ? `<a class="btn ghost" id="share" href="${esc(shareUrl)}">Share</a>` : ""}
+      <a class="btn primary" href="${attr(vcfHref)}" download="${attr(emp.slug)}.vcf">Save contact</a>
+      <a class="btn lime" href="${attr(quotation)}"${co.quotation ? ' target="_blank" rel="noopener noreferrer"' : ""}>Request a quotation</a>
+      ${shareUrl ? `<a class="btn ghost" id="sh" href="${attr(shareUrl)}">Share</a>` : ""}
     </div>
   </div>
 
   <div class="foot">
-    <span>${esc(co.name)}</span>
-    ${co.website ? `<a href="${esc(co.website)}" target="_blank" rel="noopener">${esc(co.websiteLabel || co.website)}</a>` : ""}
+    <span>${esc(co.legalName || co.name)}</span>
+    ${co.website ? `<a href="${attr(co.website)}" target="_blank" rel="noopener noreferrer">${esc(co.websiteLabel || co.website)}</a>` : ""}
   </div>
 </main>
-
-${qrTarget && qrMode === "client" ? `<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>
-  (function(){
-    var box = document.getElementById("qrbox");
-    function draw(){ try{ new QRCode(box, { text:${JSON.stringify(qrTarget)}, width:220, height:220, colorDark:"${T.qrDark}", colorLight:"${T.qrLight}", correctLevel:QRCode.CorrectLevel.M }); }catch(e){} }
-    if (window.QRCode) draw(); else { var s=document.querySelector('script[src*="qrcode"]'); if(s) s.addEventListener("load", draw); }
-  })();
-</script>` : ""}
-${shareUrl ? `<script>
-  (function(){
-    var url = ${JSON.stringify(shareUrl)};
-    var share = document.getElementById("share");
-    if (!share) return;
-    var data = { title: ${JSON.stringify(fullName + " — " + co.name)}, text: ${JSON.stringify(fullName + ", " + emp.title)}, url: url };
-    share.addEventListener("click", function(ev){
-      if (navigator.share) { ev.preventDefault(); navigator.share(data).catch(function(){}); }
-      else if (navigator.clipboard && navigator.clipboard.writeText) {
-        ev.preventDefault();
-        navigator.clipboard.writeText(url).then(function(){
-          var t = share.textContent; share.textContent = "Link copied";
-          setTimeout(function(){ share.textContent = t; }, 2000);
-        });
-      }
-      // otherwise: let the link open normally
-    });
-  })();
-</script>` : ""}
+${heightScript}
+${shareScript}
 </body>
 </html>
 `;
 }
 
-// ─── Webflow / CMS embed snippet ─────────────────────────────────────────────
-// A single self-contained <iframe> you paste into a Webflow "Code Embed" (HTML
-// Embed) block. The card lives inside the iframe, so its styles never clash with
-// the Webflow page. Uses the client-side QR build to stay under Webflow's ~10k
-// character limit for one embed.
-function embedSnippet(emp, co, logoFile) {
+// ─── Webflow embed ───────────────────────────────────────────────────────────
+function embedSnippet(emp, co, ctx) {
   const fullName = `${emp.firstName} ${emp.lastName}`.trim();
-  // srcdoc attribute value: escape & first, then " — so the inner document is
-  // reproduced exactly after the browser decodes the attribute.
-  const doc = cardHTML(emp, co, logoFile, { qr: "client" })
+  const doc = mini(cardHTML(emp, co, ctx, { embed: true }))
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;");
-  return `<iframe title="${esc(fullName)} — ${esc(co.name)} business card" loading="lazy" ` +
-    `style="width:100%;max-width:460px;height:1000px;border:0;display:block;margin:0 auto" ` +
-    `srcdoc="${doc}"></iframe>\n`;
+  const s = JSON.stringify(emp.slug);
+  return `<!-- ${fullName} — C.D.R Technology digital business card -->
+<div style="width:100%;max-width:460px;margin:0 auto">
+  <iframe id="cdrcard-${esc(emp.slug)}" title="${attr(fullName)} — business card" loading="lazy"
+    scrolling="no" style="width:100%;border:0;display:block;overflow:hidden;height:1100px"
+    srcdoc="${doc}"></iframe>
+</div>
+<script>
+(function(){
+  var f = document.getElementById("cdrcard-${esc(emp.slug)}");
+  window.addEventListener("message", function(e){
+    var d = e.data;
+    if (d && d.__cdrcard === ${s} && d.h) f.style.height = d.h + "px";
+  });
+})();
+</script>
+`;
 }
 
-function embedIndexHTML(list, co, logoFile) {
+function embedIndexHTML(list, co, ctx) {
   const T = THEME;
   const rows = list.map((e) => {
     const name = `${e.firstName} ${e.lastName}`.trim();
     return `<article>
   <header><b>${esc(name)}</b><span>${esc(e.title || "")}</span>
     <button data-slug="${esc(e.slug)}">Copy embed code</button></header>
-  <textarea readonly id="t-${esc(e.slug)}">${esc(embedSnippet(e, co, logoFile))}</textarea>
+  <textarea readonly id="t-${esc(e.slug)}">${esc(embedSnippet(e, co, ctx[e.slug]))}</textarea>
 </article>`;
   }).join("\n");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(co.name)} — Webflow embed codes</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Inter,Arial,sans-serif;background:${T.pageBg};color:${T.ink};padding:32px 20px;line-height:1.5}
-  .wrap{max-width:760px;margin:0 auto}
+  .wrap{max-width:820px;margin:0 auto}
   h1{font-size:22px;margin-bottom:6px}
-  p.lead{color:${T.muted};margin-bottom:24px}
+  p.lead{color:${T.muted};margin-bottom:22px}
+  .note{background:#fff;border:1px solid ${T.line};border-left:4px solid ${T.lime};border-radius:8px;padding:12px 14px;margin-bottom:22px;font-size:13px}
+  code{background:#eee;padding:1px 5px;border-radius:4px;font-size:12px}
   article{background:#fff;border:1px solid ${T.line};border-radius:12px;padding:16px;margin-bottom:14px}
   header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
   header b{font-size:15px}header span{color:${T.muted};font-size:13px;flex:1}
-  button{padding:8px 14px;border:1px solid ${T.ink};background:${T.ink};color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+  button{padding:9px 15px;border:1px solid ${T.ink};background:${T.ink};color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
   button.ok{background:${T.lime};color:#000;border-color:${T.lime}}
-  textarea{width:100%;height:90px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;
-    border:1px solid ${T.line};border-radius:8px;padding:10px;resize:vertical;background:#fafafa;color:#333}
+  textarea{width:100%;height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;border:1px solid ${T.line};border-radius:8px;padding:10px;resize:vertical;background:#fafafa;color:#333;white-space:pre}
 </style></head><body><div class="wrap">
   <h1>${esc(co.name)} — Webflow embed codes</h1>
-  <p class="lead">For each person: open their Webflow page, add an <b>HTML Embed</b> element,
-  and paste the code below. Publish the page. That's the whole card.</p>
+  <p class="lead">One HTML Embed per person (~13&nbsp;KB, well under Webflow's 50&nbsp;000-char limit).
+  The card is an auto-resizing <code>&lt;iframe&gt;</code> — no inner scrollbar, height follows the content.</p>
+  <div class="note">
+    The photo is already <b>embedded</b> in the code (optimised WebP, ~19&nbsp;KB) — nothing else to upload,
+    just paste and publish. <br>
+    If you would rather serve the photo from Webflow's CDN: upload <code>docs/&lt;slug&gt;.webp</code>
+    to <b>Webflow → Assets</b> and replace the <code>src="data:image/webp;base64,…"</code> value
+    with the Asset URL. Optional.
+  </div>
   ${rows}
 </div>
 <script>
   document.querySelectorAll("button[data-slug]").forEach(function(b){
-    b.addEventListener("click", function(){
-      var ta = document.getElementById("t-" + b.dataset.slug);
-      ta.select(); navigator.clipboard.writeText(ta.value);
-      var o = b.textContent; b.textContent = "Copied ✓"; b.classList.add("ok");
-      setTimeout(function(){ b.textContent = o; b.classList.remove("ok"); }, 1600);
+    b.addEventListener("click",function(){
+      var ta=document.getElementById("t-"+b.dataset.slug);
+      ta.select();navigator.clipboard.writeText(ta.value);
+      var o=b.textContent;b.textContent="Copied \u2713";b.classList.add("ok");
+      setTimeout(function(){b.textContent=o;b.classList.remove("ok")},1600);
     });
   });
 </script>
@@ -337,90 +412,87 @@ function indexHTML(list, co) {
     const name = `${e.firstName} ${e.lastName}`.trim();
     return `<li><a href="./${esc(e.slug)}.html"><b>${esc(name)}</b><span>${esc(e.title || "")}</span></a></li>`;
   }).join("\n");
-  return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(co.name)} — business cards</title>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(co.legalName || co.name)} — business cards</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Inter,Arial,sans-serif;background:${T.pageBg};color:${T.ink};padding:40px 20px;line-height:1.5}
   .wrap{max-width:520px;margin:0 auto}
-  h1{font-family:"Bebas Neue","Arial Narrow",sans-serif;font-weight:400;font-size:56px;letter-spacing:.02em;margin-bottom:4px}
-  .sub{color:${T.muted};margin-bottom:28px;padding-bottom:16px;border-bottom:1px solid ${T.ink}}
+  h1{font-family:"Bebas Neue","Arial Narrow",sans-serif;font-weight:400;font-size:52px;letter-spacing:.02em;margin-bottom:2px}
+  .sub{color:${T.muted};margin-bottom:26px;padding-bottom:16px;border-bottom:1px solid ${T.ink}}
   ul{list-style:none}
-  li a{display:flex;justify-content:space-between;align-items:center;gap:16px;
-    padding:18px;background:#fff;border:1px solid ${T.line};border-radius:12px;
-    margin-bottom:10px;text-decoration:none;color:inherit}
+  li a{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px;background:#fff;border:1px solid ${T.line};border-radius:12px;margin-bottom:10px;text-decoration:none;color:inherit}
   li a:hover{border-color:${T.ink}}
-  li a b{font-size:16px}
-  li a span{color:${T.muted};font-size:14px}
-</style></head>
-<body><div class="wrap">
+  li a b{font-size:16px}li a span{color:${T.muted};font-size:14px}
+</style></head><body><div class="wrap">
   <h1>${esc(co.name)}</h1>
-  <div class="sub">${esc(co.tagline)}</div>
+  <div class="sub">${esc(co.legalName || "")} · ${esc(co.tagline)}</div>
   <ul>${items}</ul>
 </div></body></html>
 `;
 }
 
 // ─── run ─────────────────────────────────────────────────────────────────────
-function main() {
-  if (!existsSync(DATA)) {
-    console.error("data/employees.json not found");
-    process.exit(1);
-  }
+async function main() {
+  if (!existsSync(DATA)) { console.error("data/employees.json not found"); process.exit(1); }
   const { company, employees } = JSON.parse(readFileSync(DATA, "utf8"));
   if (!company || !Array.isArray(employees)) {
-    console.error("employees.json: expected an object { company, employees: [] }");
-    process.exit(1);
+    console.error("employees.json: expected { company, employees: [] }"); process.exit(1);
   }
 
   rmSync(OUT, { recursive: true, force: true });
-  mkdirSync(OUT, { recursive: true });
+  mkdirSync(join(OUT, "embed"), { recursive: true });
   writeFileSync(join(OUT, ".nojekyll"), "");
 
   const logoFile = findLogo();
-  if (logoFile) {
-    copyFileSync(join(ASSETS, logoFile), join(OUT, logoFile));
-    console.log(`OK  logo: assets/${logoFile}`);
-  } else {
-    console.log(`..  no assets/logo.svg|png — using the "CDR" text wordmark as a stand-in`);
-  }
+  if (logoFile) { copyFileSync(join(ASSETS, logoFile), join(OUT, logoFile)); console.log(`OK  logo: assets/${logoFile}`); }
+  else console.log(`..  no assets/logo.* — using the "CDR" text wordmark`);
+
+  console.log(sharp ? "OK  sharp available" : "..  sharp NOT installed — photo reuse only");
+  console.log(jsQR ? "OK  jsqr available (QR will be verified)" : "..  jsqr NOT installed — QR check skipped");
 
   const seen = new Set();
   const built = [];
+  const ctxBySlug = {};
   for (const raw of employees) {
     const emp = { ...raw };
     emp.slug = emp.slug || slugify(`${emp.firstName}-${emp.lastName}`);
-    if (seen.has(emp.slug)) {
-      console.error(`Duplicate slug: ${emp.slug} — skipped`);
-      continue;
-    }
+    if (seen.has(emp.slug)) { console.error(`Duplicate slug: ${emp.slug} — skipped`); continue; }
     seen.add(emp.slug);
 
-    writeFileSync(join(OUT, `${emp.slug}.html`), cardHTML(emp, company, logoFile));
+    const base = (company.baseUrl || "").replace(/\/+$/, "");
+    const suffix = company.urlSuffix ?? ".html";
+    const qrTarget = emp.qr || (base ? `${base}/${emp.slug}${suffix}` : "") || company.website || "";
+    const qr = qrSvg(qrTarget, 190, 4);
+    const check = await verifyQr(qr.svg, qrTarget);
+    console.log(`OK  QR ${emp.slug}: v?${qr.modules}x${qr.modules} + 4-module quiet zone — ${check}`);
+
+    let photoNote = "no photo";
+    let photoDataUri = null;
+    if (emp.photo) {
+      const r = await makePhoto(emp.slug);
+      photoNote = r.note;
+      photoDataUri = r.dataUri;
+      if (!r.ok) console.warn(`⚠  photo ${emp.slug}: ${r.note}`);
+    }
+
+    const ctx = { logoFile, qr, photoDataUri };
+    ctxBySlug[emp.slug] = ctx;
+
+    writeFileSync(join(OUT, `${emp.slug}.html`), cardHTML(emp, company, ctx, { embed: false }));
     writeFileSync(join(OUT, `${emp.slug}.vcf`), vcard(emp, company));
+    const snip = embedSnippet(emp, company, ctx);
+    writeFileSync(join(OUT, "embed", `${emp.slug}.txt`), snip);
+    const bytes = Buffer.byteLength(snip);
+    console.log(`OK  ${emp.slug}: .html + .vcf + embed (${(bytes / 1024).toFixed(1)} KB${bytes > 50000 ? "  ⚠ OVER Webflow 50k Code Embed limit" : " — well under Webflow's 50k Code Embed limit"}) — photo: ${photoNote}`);
     built.push(emp);
-    console.log(`OK  ${emp.slug}.html  +  ${emp.slug}.vcf`);
   }
 
   writeFileSync(join(OUT, "index.html"), indexHTML(built, company));
-  console.log(`OK  index.html`);
-
-  // Webflow / CMS embed codes
-  const embedDir = join(OUT, "embed");
-  mkdirSync(embedDir, { recursive: true });
-  for (const emp of built) {
-    const snip = embedSnippet(emp, company, logoFile);
-    writeFileSync(join(embedDir, `${emp.slug}.txt`), snip);
-    const kb = (Buffer.byteLength(snip) / 1024).toFixed(1);
-    console.log(`OK  embed/${emp.slug}.txt  (${kb} KB${Buffer.byteLength(snip) > 10000 ? "  ⚠ over Webflow 10k limit" : ""})`);
-  }
-  writeFileSync(join(embedDir, "index.html"), embedIndexHTML(built, company, logoFile));
-  console.log(`OK  embed/index.html  ← open this, click "Copy embed code"`);
-
+  writeFileSync(join(OUT, "embed", "index.html"), embedIndexHTML(built, company, ctxBySlug));
   console.log(`\nDone: ${built.length} card(s) in docs/`);
 }
 
-main();
+main().catch((e) => { console.error("\nBUILD FAILED:\n" + (e && e.stack || e)); process.exit(1); });

@@ -1,13 +1,16 @@
-# CDR Digital Business Cards
+# C.D.R Technology — digital business cards
 
-One shareable web page per employee, styled after the printed CDR card:
-CDR logo, lime accent, tappable contacts (call / email / website), address, a QR code,
-and two buttons:
+One shareable card per employee, in the CDR brand style (lime / black / white,
+Bebas Neue wordmark). Every card has: the CDR logo, the person's photo, name, title,
+company, unit, tappable phone / email / website, a work address that opens in Google
+Maps, small social icons, a QR code, and three big buttons — **Save contact**,
+**Request a quotation**, **Share**.
 
-- **Save contact** — downloads a `.vcf`; the phone offers to add the person to Contacts.
-- **Share** — native share sheet on mobile, or copies the link on desktop.
+Two outputs from one JSON file:
 
-Everything is generated from a single JSON file. No build tools, no framework — just Node.
+1. **`docs/<slug>.html`** — a standalone card page (self-contained, opens from disk).
+2. **`docs/embed/<slug>.txt`** — a self-contained `<iframe>` to paste into a
+   **Webflow HTML Embed** (auto-height, no inner scrollbar, photo inlined).
 
 ---
 
@@ -16,275 +19,166 @@ Everything is generated from a single JSON file. No build tools, no framework �
 ```
 Digi-business-cards/
 ├── data/employees.json      ← YOU EDIT THIS (the only source of data)
-├── Rebuild and open.bat     ← Windows: double-click to rebuild + open in browser
-├── build.mjs                ← generator (do not edit unless changing design)
+├── assets/
+│   ├── logo.svg | logo.png      official CDR logo (optional; falls back to Bebas "CDR")
+│   └── <slug>.src.png           photo source, roughly square — auto-cropped on build
+├── build.mjs                ← generator
 ├── serve.mjs                ← local preview server
-├── assets/                  ← put the official logo here (logo.svg / logo.png)
-├── vendor/qrcode.cjs        ← bundled QR-code library (no npm install needed)
-├── package.json             ← npm scripts
-├── docs/                    ← GENERATED output — this folder is the website you upload
+├── vendor/qrcode.cjs        ← bundled QR library
+├── Rebuild and open.bat     ← Windows: double-click to rebuild + open
+├── docs/                    ← GENERATED — the website
 │   ├── index.html               list of all cards
-│   ├── <slug>.html              one employee card (self-contained — opens from disk)
-│   ├── <slug>.vcf               one contact file
-│   └── embed/                   paste-into-Webflow codes
+│   ├── <slug>.html              standalone card
+│   ├── <slug>.webp              optimised photo (also usable in Webflow Assets)
+│   ├── <slug>.vcf               contact file
+│   └── embed/
 │       ├── index.html               open this, click "Copy embed code"
-│       └── <slug>.txt               the raw <iframe> snippet
+│       └── <slug>.txt               the <iframe> snippet for Webflow
 └── README.md
 ```
 
-`docs/` is rebuilt from scratch on every build — never edit it by hand.
-Each `docs/<slug>.html` is fully self-contained (the QR code is baked in) and works
-even when opened straight from the file system.
+`docs/` is rebuilt from scratch every run — never hand-edit it.
 
 ---
 
-## 2. Requirements
+## 2. Setup (once)
 
-- [Node.js](https://nodejs.org) 18 or newer. Check with `node --version`.
-- That's it.
+```bash
+cd Digi-business-cards
+npm install
+```
+
+Installs `sharp` + `jsqr` (dev only). They let the build (re)encode the photo to WebP
+and automatically verify that the generated QR decodes to the right URL. If they are
+missing the build still runs — it reuses the last `assets/<slug>.webp` and skips the
+QR self-check.
 
 ---
 
-## 3. Edit the data
+## 3. Edit the data — `data/employees.json`
 
-Open **`data/employees.json`** in any text editor.
-
-### Company block (applies to every card)
+### `company` (applies to every card)
 
 ```json
 "company": {
   "name": "CDR",
+  "legalName": "C.D.R Technology OÜ",
   "tagline": "Creative | Development | Research",
   "unit": "GPU & GSE Equipment",
   "website": "https://cdr.ee",
   "websiteLabel": "cdr.ee",
   "baseUrl": "https://cdr.ee/business-cards",
+  "urlSuffix": "",
+  "linkedin": "https://www.linkedin.com/company/c-d-r-technology-o%C3%BC/",
+  "quotation": "",
   "address": {
     "street": "Taevavärava tee 6b-24",
-    "locality": "Lehmja küla, Rae vald",
+    "locality": "Lehmja küla, Rae vald, Harju maakond",
     "postalCode": "75306",
     "country": "Estonia"
   }
 }
 ```
 
-`baseUrl` is the address where the cards are published. The QR code and the Share
-button are built from it. **If you move the site, update `baseUrl` and rebuild.**
+| Key | Meaning |
+|---|---|
+| `name` | the wordmark shown in the lime header (kept short — "CDR") |
+| `legalName` | full company name shown on the card and saved into the contact |
+| `baseUrl` + `urlSuffix` | how the card's own URL is built: `baseUrl` + `/` + `slug` + `urlSuffix`. `urlSuffix:""` gives clean Webflow URLs (`…/elmahdi-lamine`). **The QR code and Share point here — it must match the real published page.** |
+| `linkedin` | company LinkedIn (small icon). |
+| `quotation` | URL for a real "Request a quotation" page/popup. **Leave `""`** and the button becomes a pre-filled email to the person with subject *Quotation request* (there is no direct URL for the cdr.ee quotation popup). |
 
-### Add an employee
-
-Add another object to the `employees` array (comma between objects, none after the last):
+### `employees` (one object each)
 
 ```json
-"employees": [
-  {
-    "slug": "elmahdi-lamine",
-    "firstName": "Elmahdi",
-    "lastName": "Lamine",
-    "title": "CEO",
-    "phone": "+372 555 121 47",
-    "email": "el@cdr.ee",
-    "linkedin": "",
-    "photo": "",
-    "qr": ""
-  },
-  {
-    "slug": "anna-tamm",
-    "firstName": "Anna",
-    "lastName": "Tamm",
-    "title": "Sales Manager",
-    "phone": "+372 5555 0000",
-    "email": "anna@cdr.ee",
-    "linkedin": "https://www.linkedin.com/in/annatamm",
-    "photo": "",
-    "qr": ""
-  }
-]
+{
+  "slug": "elmahdi-lamine",
+  "firstName": "Elmahdi",
+  "lastName": "Lamine",
+  "title": "CEO",
+  "phone": "+372 555 121 47",
+  "email": "el@cdr.ee",
+  "linkedin": "",
+  "photo": "elmahdi-lamine.webp",
+  "qr": ""
+}
 ```
 
-| Field | Meaning | If left `""` |
+| Field | Notes | Empty `""` |
 |---|---|---|
-| `slug` | file name → `anna-tamm.html`, `anna-tamm.vcf`. Latin letters, digits, dashes, no spaces | auto-generated from first + last name |
-| `firstName`, `lastName` | name | — |
+| `slug` | file name + URL segment. Latin, no spaces. **Don't change once shared.** | generated from the name |
 | `title` | job title | row hidden |
-| `phone` | phone, any readable format | row hidden |
-| `email` | work email | row hidden |
-| `linkedin` | full profile URL | row hidden |
-| `qr` | where the QR code points | points to the card itself |
-| `photo` | reserved, not used yet | — |
+| `phone` / `email` | clickable | row hidden |
+| `linkedin` | the person's **own** LinkedIn URL — only add if you have the exact link | icon hidden |
+| `photo` | any truthy value turns the photo on; put the source at `assets/<slug>.src.png` | no photo (lime initials block) |
+| `qr` | override the QR target; normally leave `""` to use the card's own URL | uses the card URL |
 
-### Change an employee
+### Add / change / remove a person
 
-Edit the values in their object. **Do not change `slug`** for someone who already has
-cards printed / links shared — the QR codes point at `<slug>.html`.
-
-### Remove an employee
-
-Delete their object (and the stray comma). After the next build their files disappear from `docs/`.
+- **Add:** new object in `employees` + `assets/<slug>.src.png` (a roughly square photo), then build.
+- **Change:** edit the values. Replace `assets/<slug>.src.png` to change the photo.
+- **Remove:** delete the object. Its files leave `docs/` on the next build.
 
 ---
 
-## 4. Build & view — the easy way (Windows)
+## 4. Build & preview
 
-**Double-click `Rebuild and open.bat`.**
-It regenerates the cards and opens `docs/index.html` in your browser. Done.
+**Windows:** double-click **`Rebuild and open.bat`**.
 
-If Windows shows a "protected your PC" dialog: *More info → Run anyway* (it's a 15-line
-text file, you can open it in Notepad to check).
+**Or:** `npm run build` then open `docs/index.html` (double-click, or right-click →
+Open with → your browser). `npm run serve` starts a local server at
+<http://localhost:8080> (needed only for the Share button's native share to work).
 
-### Or just open a file
-
-The cards are plain self-contained HTML. You can also simply **double-click any file in
-`docs/`** — `index.html`, or `elmahdi-lamine.html` — and it opens in the browser. No build,
-no server needed just to look at them.
-
-### Or from a terminal
-
-```bash
-cd path\to\Digi-business-cards
-node build.mjs        # regenerate docs/
-```
-
-```
-OK  elmahdi-lamine.html  +  elmahdi-lamine.vcf
-OK  index.html
-
-Done: 1 card(s) in docs/
-```
-
-> ⚠️ Run this **inside the `Digi-business-cards` folder**, not its parent. `npm` commands
-> pick up whatever `package.json` is in the current folder.
+The build prints, per person: the QR check result, the photo sizes, and the embed size.
 
 ---
 
-## 5. Preview with a real local server (optional)
+## 5. Publish
 
-Only needed if you want the **Share** button's native "share" / "copy link" to work while
-testing (those need `http://`, not a file). Otherwise skip this.
-
-```bash
-cd path\to\Digi-business-cards
-node serve.mjs        # → http://localhost:8080
-```
-
-Open <http://localhost:8080/>. Stop with `Ctrl+C`.
-`node serve.mjs 3000` uses a different port.
-
-To preview on your phone: same Wi-Fi, find your computer's local IP (e.g. `192.168.1.20`),
-open `http://192.168.1.20:8080/`.
-
----
-
-## 6a. Publish via Webflow (embed) — recommended if the site is in Webflow
-
-Each build also produces a ready-to-paste embed for every person in **`docs/embed/`**.
+### A. Webflow (recommended)
 
 1. `npm run build`
-2. Open **`docs/embed/index.html`** in a browser → click **"Copy embed code"** for the person.
-   (Or open `docs/embed/<slug>.txt` and copy everything.)
-3. In Webflow: open that person's page → drag in an **HTML Embed** element →
-   paste the code → **Save** → **Publish** the page.
+2. Open **`docs/embed/index.html`** → **Copy embed code** for the person.
+3. Webflow → their page → drag in an **HTML Embed** → paste → **Save** → **Publish**.
 
-The embed is a single self-contained `<iframe>` (~7 KB, under Webflow's 10 000-char
-limit). The card lives inside the iframe, so Webflow's styles never touch it. The QR
-code and web fonts load from a CDN when the page is live.
+The embed is one self-contained `<iframe>` (~32 KB, well under Webflow's 50 000-char
+limit). The photo is baked in as an optimised WebP; the QR is inline SVG; the card is
+isolated from Webflow's CSS; the iframe height follows the content (no inner scrollbar).
 
-Set `baseUrl` in `data/employees.json` to the **Webflow page URL pattern**, e.g.
-`https://cdr-group.webflow.io` or `https://cdr.ee` — whatever the published page address
-is — so the QR code and Share button point back to the right place. One `baseUrl` +
-`/<slug>.html` must equal the real page, so name the Webflow page slugs to match, **or**
-put the exact per-person page URL in each employee's `qr` field.
+Publish each person's page at exactly `baseUrl + "/" + slug` (e.g.
+`https://cdr.ee/business-cards/elmahdi-lamine`) so the QR and Share resolve.
 
----
+> To serve the photo from Webflow's CDN instead of inline: upload `docs/<slug>.webp`
+> to Webflow → Assets and replace the `src="data:image/webp;base64,…"` value with the
+> Asset URL.
 
-## 6b. Publish (upload the files to a static host / the cdr.ee server)
+### B. Static upload (cdr.ee server / Netlify / …)
 
-The whole site is the **`docs/`** folder — plain static files, no server code.
-Publishing = copy the *contents* of `docs/` to a folder on the cdr.ee hosting.
-
-Target: **`https://cdr.ee/business-cards/`** (set in `data/employees.json` → `baseUrl`).
-
-1. `npm run build` — refresh `docs/`.
-2. Open the cdr.ee hosting (cPanel / FTP / SFTP — whatever CDR uses).
-3. In the web root (next to the main site's `index.html`), create a folder **`business-cards`**.
-4. Upload **everything inside `docs/`** into it — `index.html`, every `*.html`, every `*.vcf`.
-   (The `.nojekyll` file is only for GitHub Pages; it does no harm but isn't needed here.)
-5. Check: <https://cdr.ee/business-cards/> shows the list, and
-   <https://cdr.ee/business-cards/elmahdi-lamine.html> shows the card.
-
-On every later change: `npm run build`, then re-upload the changed files from `docs/`
-(or just re-upload the whole folder — it's tiny).
-
-> **If you publish under a different path** (e.g. `cards.cdr.ee`, or `cdr.ee/cards/`):
-> change `baseUrl` in `data/employees.json` to that exact address, run `npm run build`,
-> and re-upload. The QR codes and the Share button are generated from `baseUrl`.
-
-### Keeping the git repo in sync (optional)
-
-The GitHub repo (`Digi-business-cards`, private) is just the backup / edit history:
-
-```bash
-npm run build
-git add -A
-git commit -m "Update cards"
-git push
-```
+Copy the contents of `docs/` to the host. The card URLs are `<host>/<slug>` (or
+`<slug>.html` if you set `urlSuffix` back to `".html"`).
 
 ---
 
-## 7. How employees actually use the card
+## 6. What the buttons do
 
-Each person has three things: a **URL**, a **QR code** (shown on their own card page),
-and a **`.vcf`** contact file.
-
-**Give each employee their link**, e.g. `https://cdr.ee/business-cards/elmahdi-lamine.html`
-
-Ways to hand it to a contact:
-
-| Situation | What to do |
+| Button | Action |
 |---|---|
-| Email signature | Add a line: `Digital card: <link>` — or paste the QR image and hyperlink it |
-| In person | Open your own card page on your phone, let the other person scan the on-screen QR |
-| Chat / WhatsApp / LinkedIn message | Tap **Share** on your card page, or just paste the link |
-| Printed materials, badges, slide decks | Screenshot / save the QR from your card page and place it there |
-| Someone wants your contact saved | Send them the link; they tap **Save contact** to import the `.vcf` |
-
-Tip for the employee: open the link on the phone once and **Add to Home Screen** —
-it then behaves like an app icon that opens the card instantly.
+| **Save contact** | downloads a vCard (`data:` URI — works everywhere, incl. inside the Webflow iframe) with full name, title, company `C.D.R Technology OÜ`, phone, email, website, address |
+| **Request a quotation** | opens the `company.quotation` URL if set; otherwise a pre-filled email to the person, subject **Quotation request** |
+| **Share** | native share sheet on mobile, copy-link on desktop |
 
 ---
 
-## 8. Logo
+## 7. Design / logo
 
-The card header is a lime block with the CDR logo.
-
-To use the **exact official logo file**: put it in the `assets/` folder as
-**`assets/logo.svg`** (best) or `assets/logo.png`, then rebuild. Use a file that is
-just the black "CDR" wordmark (transparent background works best — the lime block is
-already behind it). See `assets/README.md`.
-
-If `assets/` has no logo file, the header shows "CDR" set in a heavy sans-serif
-(Arial Black) as a stand-in.
+Colours + type: `THEME` in `build.mjs`. Layout: `cardHTML()`.
+Official logo: drop `assets/logo.svg` (or `.png`) and it is used unchanged inside the
+lime header; otherwise "CDR" is set in Bebas Neue.
 
 ---
 
-## 9. Restyle
+## 8. With Claude Code
 
-Colors and fonts: the `THEME` object at the top of `build.mjs`
-(`lime` is the brand green; `ink` is the text black).
-Card layout: the `cardHTML()` function in `build.mjs`.
-Rebuild after any change.
-
----
-
-## 10. Working with Claude Code
-
-Ask in plain language and the `business-card` skill handles it:
-
-- "add employee Anna Tamm, Sales Manager, +372 5555 0000, anna@cdr.ee"
-- "remove John Doe"
-- "change the company address to ..."
-- "make the accent color blue"
-- "rebuild the cards"
-
-The skill edits `data/employees.json`, runs the build, and reports what changed.
+"add employee …", "change the address", "swap Elmahdi's photo", "rebuild the cards" —
+the `business-card` skill edits `data/employees.json`, runs the build (QR verified,
+photo re-encoded) and reports the embed size + where the QR points.
