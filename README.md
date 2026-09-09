@@ -15,18 +15,22 @@ Everything is generated from a single JSON file. No build tools, no framework �
 
 ```
 Digi-business-cards/
-├── data/employees.json   ← YOU EDIT THIS (the only source of data)
-├── build.mjs             ← generator (do not edit unless changing design)
-├── serve.mjs             ← local preview server
-├── package.json          ← npm scripts
-├── docs/                 ← GENERATED output — this folder is the website you upload
-│   ├── index.html            list of all cards
-│   ├── <slug>.html           one employee card
-│   └── <slug>.vcf            one contact file
+├── data/employees.json      ← YOU EDIT THIS (the only source of data)
+├── Rebuild and open.bat     ← Windows: double-click to rebuild + open in browser
+├── build.mjs                ← generator (do not edit unless changing design)
+├── serve.mjs                ← local preview server
+├── vendor/qrcode.cjs        ← bundled QR-code library (no npm install needed)
+├── package.json             ← npm scripts
+├── docs/                    ← GENERATED output — this folder is the website you upload
+│   ├── index.html               list of all cards
+│   ├── <slug>.html              one employee card (self-contained — opens from disk)
+│   └── <slug>.vcf               one contact file
 └── README.md
 ```
 
 `docs/` is rebuilt from scratch on every build — never edit it by hand.
+Each `docs/<slug>.html` is fully self-contained (the QR code is baked in) and works
+even when opened straight from the file system.
 
 ---
 
@@ -50,7 +54,7 @@ Open **`data/employees.json`** in any text editor.
   "unit": "GPU & GSE Equipment",
   "website": "https://cdr.ee",
   "websiteLabel": "cdr.ee",
-  "baseUrl": "https://mrbaprojekt-boop.github.io/Digi-business-cards",
+  "baseUrl": "https://cdr.ee/business-cards",
   "address": {
     "street": "Taevavärava tee 6b-24",
     "locality": "Lehmja küla, Rae vald",
@@ -116,43 +120,54 @@ Delete their object (and the stray comma). After the next build their files disa
 
 ---
 
-## 4. Build
+## 4. Build & view — the easy way (Windows)
 
-From the project folder:
+**Double-click `Rebuild and open.bat`.**
+It regenerates the cards and opens `docs/index.html` in your browser. Done.
+
+If Windows shows a "protected your PC" dialog: *More info → Run anyway* (it's a 15-line
+text file, you can open it in Notepad to check).
+
+### Or just open a file
+
+The cards are plain self-contained HTML. You can also simply **double-click any file in
+`docs/`** — `index.html`, or `elmahdi-lamine.html` — and it opens in the browser. No build,
+no server needed just to look at them.
+
+### Or from a terminal
 
 ```bash
-npm run build
-# or:  node build.mjs
+cd path\to\Digi-business-cards
+node build.mjs        # regenerate docs/
 ```
-
-Output:
 
 ```
 OK  elmahdi-lamine.html  +  elmahdi-lamine.vcf
-OK  anna-tamm.html  +  anna-tamm.vcf
 OK  index.html
 
-Done: 2 card(s) in docs/
+Done: 1 card(s) in docs/
 ```
+
+> ⚠️ Run this **inside the `Digi-business-cards` folder**, not its parent. `npm` commands
+> pick up whatever `package.json` is in the current folder.
 
 ---
 
-## 5. Preview on localhost
+## 5. Preview with a real local server (optional)
+
+Only needed if you want the **Share** button's native "share" / "copy link" to work while
+testing (those need `http://`, not a file). Otherwise skip this.
 
 ```bash
-npm run serve
-# or:  node serve.mjs
+cd path\to\Digi-business-cards
+node serve.mjs        # → http://localhost:8080
 ```
 
-Then open:
+Open <http://localhost:8080/>. Stop with `Ctrl+C`.
+`node serve.mjs 3000` uses a different port.
 
-- All cards:      <http://localhost:8080/>
-- One card:       <http://localhost:8080/elmahdi-lamine.html>
-
-`npm start` does both — build, then serve.
-
-To preview on your phone while it runs: make sure the phone is on the same Wi-Fi, find
-your computer's local IP (e.g. `192.168.1.20`) and open `http://192.168.1.20:8080/`.
+To preview on your phone: same Wi-Fi, find your computer's local IP (e.g. `192.168.1.20`),
+open `http://192.168.1.20:8080/`.
 
 ---
 

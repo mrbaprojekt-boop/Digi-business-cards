@@ -3,18 +3,22 @@
 //
 //  Run:     node build.mjs   (or: npm run build)
 //  Input:   data/employees.json
-//  Output:  docs/<slug>.html   — the employee's card
+//  Output:  docs/<slug>.html   — the employee's card (fully self-contained,
+//                                works when opened directly from disk)
 //           docs/<slug>.vcf    — contact file for phones ("Save contact")
 //           docs/index.html    — list of all cards
-//           docs/.nojekyll     — tells GitHub Pages to serve files as-is
+//           docs/.nojekyll     — harmless; only matters if hosted on GitHub Pages
 //
 //  Design tokens (colors / fonts) live in the THEME object below.
 //  Card markup lives in the cardHTML() function.
+//  The QR code is generated here at build time and inlined as SVG — no internet
+//  needed to display it.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import qrcode from "./vendor/qrcode.cjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const DATA = join(ROOT, "data", "employees.json");
@@ -28,6 +32,8 @@ const THEME = {
   muted: "#6b6b6b",  // labels, address
   line: "#e6e6e6",   // dividers
   pageBg: "#f4f4f2", // page background around the card
+  qrDark: "#1a1a1a",
+  qrLight: "#f0f0f0",
 };
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -46,6 +52,20 @@ function slugify(s) {
     .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+// build-time QR code → inline SVG string
+function qrSvg(text) {
+  const qr = qrcode(0, "M");
+  qr.addData(text);
+  qr.make();
+  const n = qr.getModuleCount();
+  let d = "";
+  for (let r = 0; r < n; r++)
+    for (let c = 0; c < n; c++)
+      if (qr.isDark(r, c)) d += `M${c},${r}h1v1h-1z`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges" role="img" aria-label="QR code">` +
+    `<rect width="${n}" height="${n}" fill="${THEME.qrLight}"/><path d="${d}" fill="${THEME.qrDark}"/></svg>`;
 }
 
 // ─── vCard ───────────────────────────────────────────────────────────────────
@@ -77,8 +97,9 @@ function cardHTML(emp, co) {
   const a = co.address || {};
   const addr = [a.street, a.locality, [a.postalCode, a.country].filter(Boolean).join(" ")]
     .filter(Boolean);
-  const qrOverride = emp.qr ? JSON.stringify(emp.qr) : "null";
-  const shareUrl = co.baseUrl ? `${co.baseUrl.replace(/\/+$/, "")}/${emp.slug}.html` : "";
+  const base = (co.baseUrl || "").replace(/\/+$/, "");
+  const shareUrl = base ? `${base}/${emp.slug}.html` : "";
+  const qrTarget = emp.qr || shareUrl || co.website || "";
 
   return `<!doctype html>
 <html lang="en">
@@ -100,7 +121,7 @@ ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{
-    font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
     background:var(--page); color:var(--ink);
     min-height:100vh; display:flex; align-items:center; justify-content:center;
     padding:24px; line-height:1.5;
@@ -112,7 +133,7 @@ ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
   }
   .accent{height:8px;background:var(--lime)}
   .pad{padding:32px}
-  .logo{font-family:Anton,Inter,sans-serif;font-size:60px;line-height:.9;letter-spacing:.01em}
+  .logo{font-family:Anton,"Arial Narrow",Inter,sans-serif;font-weight:900;font-size:60px;line-height:.9;letter-spacing:.01em}
   .tagline{
     margin-top:12px;padding-top:12px;border-top:1px solid var(--ink);
     font-size:13px;font-weight:500;letter-spacing:.01em;color:var(--ink)
@@ -134,8 +155,8 @@ ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
   a.row:hover .v{color:#000;text-decoration:underline}
   .addr{padding:14px 0 0;font-size:14px;color:var(--muted)}
   .qr-wrap{margin-top:24px;display:flex;gap:16px;align-items:center}
-  #qr{width:104px;height:104px;flex:none;background:#f0f0f0;border-radius:10px;padding:8px}
-  #qr img,#qr canvas{width:100%!important;height:100%!important;display:block}
+  .qr{width:104px;height:104px;flex:none;background:${T.qrLight};border-radius:10px;padding:8px}
+  .qr svg{display:block;width:100%;height:100%}
   .qr-hint{font-size:12px;color:var(--muted)}
   .actions{display:flex;gap:10px;margin-top:26px;flex-wrap:wrap}
   .btn{
@@ -172,14 +193,14 @@ ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
       ${addr.length ? `<div class="addr">${addr.map(esc).join("<br>")}</div>` : ""}
     </div>
 
-    <div class="qr-wrap">
-      <div id="qr"></div>
+    ${qrTarget ? `<div class="qr-wrap">
+      <div class="qr">${qrSvg(qrTarget)}</div>
       <div class="qr-hint">Scan with a phone camera<br>to open this card</div>
-    </div>
+    </div>` : ""}
 
     <div class="actions">
       <a class="btn primary" href="./${esc(emp.slug)}.vcf" download>Save contact</a>
-      <a class="btn ghost" id="share" href="#">Share</a>
+      ${shareUrl ? `<a class="btn ghost" id="share" href="${esc(shareUrl)}">Share</a>` : ""}
     </div>
   </div>
 
@@ -189,37 +210,25 @@ ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
   </div>
 </main>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>
+${shareUrl ? `<script>
   (function(){
-    var override = ${qrOverride};
-    var url = override || ${shareUrl ? JSON.stringify(shareUrl) : "location.href"};
-    try{
-      new QRCode(document.getElementById("qr"), {
-        text: url, width: 200, height: 200,
-        colorDark: "#1a1a1a", colorLight: "#f0f0f0",
-        correctLevel: QRCode.CorrectLevel.M
-      });
-    }catch(e){ document.getElementById("qr").remove(); }
-
+    var url = ${JSON.stringify(shareUrl)};
     var share = document.getElementById("share");
-    var shareData = {
-      title: ${JSON.stringify(fullName + " — " + co.name)},
-      text: ${JSON.stringify(fullName + ", " + emp.title)},
-      url: url
-    };
+    if (!share) return;
+    var data = { title: ${JSON.stringify(fullName + " — " + co.name)}, text: ${JSON.stringify(fullName + ", " + emp.title)}, url: url };
     share.addEventListener("click", function(ev){
-      ev.preventDefault();
-      if (navigator.share) { navigator.share(shareData).catch(function(){}); }
-      else if (navigator.clipboard) {
+      if (navigator.share) { ev.preventDefault(); navigator.share(data).catch(function(){}); }
+      else if (navigator.clipboard && navigator.clipboard.writeText) {
+        ev.preventDefault();
         navigator.clipboard.writeText(url).then(function(){
-          share.textContent = "Link copied";
-          setTimeout(function(){ share.textContent = "Share"; }, 2000);
+          var t = share.textContent; share.textContent = "Link copied";
+          setTimeout(function(){ share.textContent = t; }, 2000);
         });
-      } else { prompt("Copy this link:", url); }
+      }
+      // otherwise: let the link open normally
     });
   })();
-</script>
+</script>` : ""}
 </body>
 </html>
 `;
@@ -239,9 +248,9 @@ function indexHTML(list, co) {
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Inter,sans-serif;background:${T.pageBg};color:${T.ink};padding:40px 20px;line-height:1.5}
+  body{font-family:Inter,Arial,sans-serif;background:${T.pageBg};color:${T.ink};padding:40px 20px;line-height:1.5}
   .wrap{max-width:520px;margin:0 auto}
-  h1{font-family:Anton,sans-serif;font-size:44px;margin-bottom:4px}
+  h1{font-family:Anton,"Arial Narrow",sans-serif;font-weight:900;font-size:44px;margin-bottom:4px}
   .sub{color:${T.muted};margin-bottom:28px;padding-bottom:16px;border-bottom:1px solid ${T.ink}}
   ul{list-style:none}
   li a{display:flex;justify-content:space-between;align-items:center;gap:16px;
