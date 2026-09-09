@@ -6,6 +6,7 @@
     "website": "https://cdr.ee",
     "websiteLabel": "cdr.ee",
     "baseUrl": "https://cdr.ee/business-cards",
+    "urlSuffix": "",
     "address": {
       "street": "Taevavärava tee 6b-24",
       "locality": "Lehmja küla, Rae vald",

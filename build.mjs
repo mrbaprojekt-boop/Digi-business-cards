@@ -115,8 +115,10 @@ function cardHTML(emp, co, logoFile, opts = {}) {
   const addr = [a.street, a.locality, [a.postalCode, a.country].filter(Boolean).join(" ")]
     .filter(Boolean);
   const base = (co.baseUrl || "").replace(/\/+$/, "");
-  const shareUrl = base ? `${base}/${emp.slug}.html` : "";
+  const suffix = co.urlSuffix ?? ".html";   // "" for Webflow-style clean URLs
+  const shareUrl = base ? `${base}/${emp.slug}${suffix}` : "";
   const qrTarget = emp.qr || shareUrl || co.website || "";
+  const vcfHref = "data:text/vcard;charset=utf-8," + encodeURIComponent(vcard(emp, co));
 
   return `<!doctype html>
 <html lang="en">
@@ -222,7 +224,7 @@ ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
     </div>` : ""}
 
     <div class="actions">
-      <a class="btn primary" href="./${esc(emp.slug)}.vcf" download>Save contact</a>
+      <a class="btn primary" href="${vcfHref}" download="${esc(emp.slug)}.vcf">Save contact</a>
       ${shareUrl ? `<a class="btn ghost" id="share" href="${esc(shareUrl)}">Share</a>` : ""}
     </div>
   </div>

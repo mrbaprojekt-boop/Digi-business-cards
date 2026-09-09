@@ -7,7 +7,7 @@
 <meta name=&quot;description&quot; content=&quot;Elmahdi Lamine, CEO at CDR. Creative | Development | Research&quot;>
 <meta property=&quot;og:title&quot; content=&quot;Elmahdi Lamine — CDR&quot;>
 <meta property=&quot;og:description&quot; content=&quot;CEO · Creative | Development | Research&quot;>
-<meta property=&quot;og:url&quot; content=&quot;https://cdr.ee/business-cards/elmahdi-lamine.html&quot;>
+<meta property=&quot;og:url&quot; content=&quot;https://cdr.ee/business-cards/elmahdi-lamine&quot;>
 <link rel=&quot;preconnect&quot; href=&quot;https://fonts.googleapis.com&quot;>
 <link rel=&quot;preconnect&quot; href=&quot;https://fonts.gstatic.com&quot; crossorigin>
 <link href=&quot;https://fonts.googleapis.com/css2?family=Bebas+Neue&amp;family=Inter:wght@400;500;600;700&amp;display=swap&quot; rel=&quot;stylesheet&quot;>
@@ -102,8 +102,8 @@
     </div>
 
     <div class=&quot;actions&quot;>
-      <a class=&quot;btn primary&quot; href=&quot;./elmahdi-lamine.vcf&quot; download>Save contact</a>
-      <a class=&quot;btn ghost&quot; id=&quot;share&quot; href=&quot;https://cdr.ee/business-cards/elmahdi-lamine.html&quot;>Share</a>
+      <a class=&quot;btn primary&quot; href=&quot;data:text/vcard;charset=utf-8,BEGIN%3AVCARD%0D%0AVERSION%3A3.0%0D%0AN%3ALamine%3BElmahdi%3B%3B%3B%0D%0AFN%3AElmahdi%20Lamine%0D%0AORG%3ACDR%3BGPU%20%26%20GSE%20Equipment%0D%0ATITLE%3ACEO%0D%0ATEL%3BTYPE%3DWORK%2CVOICE%3A%2B372%20555%20121%2047%0D%0AEMAIL%3BTYPE%3DWORK%3Ael%40cdr.ee%0D%0AURL%3Ahttps%3A%2F%2Fcdr.ee%0D%0AADR%3BTYPE%3DWORK%3A%3B%3BTaevav%C3%A4rava%20tee%206b-24%3BLehmja%20k%C3%BCla%5C%2C%20Rae%20vald%3B%3B75306%3BEstonia%0D%0AEND%3AVCARD%0D%0A&quot; download=&quot;elmahdi-lamine.vcf&quot;>Save contact</a>
+      <a class=&quot;btn ghost&quot; id=&quot;share&quot; href=&quot;https://cdr.ee/business-cards/elmahdi-lamine&quot;>Share</a>
     </div>
   </div>
 
@@ -117,13 +117,13 @@
 <script>
   (function(){
     var box = document.getElementById(&quot;qrbox&quot;);
-    function draw(){ try{ new QRCode(box, { text:&quot;https://cdr.ee/business-cards/elmahdi-lamine.html&quot;, width:220, height:220, colorDark:&quot;#111111&quot;, colorLight:&quot;#f0f0f0&quot;, correctLevel:QRCode.CorrectLevel.M }); }catch(e){} }
+    function draw(){ try{ new QRCode(box, { text:&quot;https://cdr.ee/business-cards/elmahdi-lamine&quot;, width:220, height:220, colorDark:&quot;#111111&quot;, colorLight:&quot;#f0f0f0&quot;, correctLevel:QRCode.CorrectLevel.M }); }catch(e){} }
     if (window.QRCode) draw(); else { var s=document.querySelector('script[src*=&quot;qrcode&quot;]'); if(s) s.addEventListener(&quot;load&quot;, draw); }
   })();
 </script>
 <script>
   (function(){
-    var url = &quot;https://cdr.ee/business-cards/elmahdi-lamine.html&quot;;
+    var url = &quot;https://cdr.ee/business-cards/elmahdi-lamine&quot;;
     var share = document.getElementById(&quot;share&quot;);
     if (!share) return;
     var data = { title: &quot;Elmahdi Lamine — CDR&quot;, text: &quot;Elmahdi Lamine, CEO&quot;, url: url };
