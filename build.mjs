@@ -272,8 +272,8 @@ ${head}
   .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
   .btn{display:flex;align-items:center;justify-content:center;text-align:center;min-height:52px;padding:12px 14px;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;border:1.5px solid var(--ink)}
   .btn.primary{background:var(--ink);color:#fff}
-  .btn.lime{background:var(--lime);color:#000;border-color:var(--lime)}
-  .btn.ghost{background:#fff;color:var(--ink);grid-column:1/-1}
+  .btn.ghost{background:#fff;color:var(--ink)}
+  .btn.lime{background:var(--lime);color:#000;border-color:var(--lime);grid-column:1/-1}
   .btn:active{transform:translateY(1px)}
   .foot{padding:15px 30px;background:#fafafa;border-top:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:12px}
   .foot a{text-decoration:none}
@@ -309,8 +309,8 @@ ${head}
 
     <div class="actions">
       <a class="btn primary" href="${attr(vcfHref)}" download="${attr(emp.slug)}.vcf">Save contact</a>
-      <a class="btn lime" href="${attr(quotation)}"${co.quotation ? ' target="_blank" rel="noopener noreferrer"' : ""}>Request a quotation</a>
       ${shareUrl ? `<a class="btn ghost" id="sh" href="${attr(shareUrl)}">Share</a>` : ""}
+      <a class="btn lime" href="${attr(quotation)}"${co.quotation ? ' target="_blank" rel="noopener noreferrer"' : ""}>Request a quotation</a>
     </div>
   </div>
 
