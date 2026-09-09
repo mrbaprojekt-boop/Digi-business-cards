@@ -27,7 +27,7 @@ const ASSETS = join(ROOT, "assets");
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const THEME = {
-  lime: "#cde939",   // CDR brand green (from the logo lockup)
+  lime: "#d1ec3a",   // CDR brand green (from the logo lockup)
   ink: "#111111",    // primary text / black
   paper: "#ffffff",  // card background
   muted: "#6b6b6b",  // labels, address
@@ -127,7 +127,7 @@ function cardHTML(emp, co, logoFile) {
 ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --lime:${T.lime}; --ink:${T.ink}; --paper:${T.paper};
@@ -146,13 +146,13 @@ ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
     box-shadow:0 20px 60px rgba(0,0,0,.08);
   }
   .brand{
-    background:var(--lime); padding:44px 32px 40px;
+    background:var(--lime); padding:48px 32px 44px;
     display:flex; align-items:center; justify-content:center;
   }
-  .brand-img{display:block;width:auto;max-width:60%;height:auto}
+  .brand-img{display:block;width:auto;max-width:64%;height:auto}
   .brand-text{
-    font-family:"Arial Black","Helvetica Neue",Helvetica,Arial,sans-serif;
-    font-weight:900; font-size:76px; line-height:1; letter-spacing:-.02em; color:#000;
+    font-family:"Bebas Neue","Oswald","Arial Narrow",sans-serif;
+    font-weight:400; font-size:132px; line-height:.8; letter-spacing:.01em; color:#000;
   }
   .pad{padding:32px}
   .tagline{
@@ -189,7 +189,7 @@ ${shareUrl ? `<meta property="og:url" content="${esc(shareUrl)}">` : ""}
   .foot{padding:16px 32px;background:#fafafa;border-top:1px solid var(--line);
     font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
   .foot a{color:var(--muted)}
-  @media(max-width:400px){.pad{padding:24px}.brand{padding:36px 24px}.brand-text{font-size:64px}}
+  @media(max-width:400px){.pad{padding:24px}.brand{padding:40px 24px}.brand-text{font-size:108px}}
 </style>
 </head>
 <body>
@@ -264,12 +264,12 @@ function indexHTML(list, co) {
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(co.name)} — business cards</title>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Inter,Arial,sans-serif;background:${T.pageBg};color:${T.ink};padding:40px 20px;line-height:1.5}
   .wrap{max-width:520px;margin:0 auto}
-  h1{font-family:Anton,"Arial Narrow",sans-serif;font-weight:900;font-size:44px;margin-bottom:4px}
+  h1{font-family:"Bebas Neue","Arial Narrow",sans-serif;font-weight:400;font-size:56px;letter-spacing:.02em;margin-bottom:4px}
   .sub{color:${T.muted};margin-bottom:28px;padding-bottom:16px;border-bottom:1px solid ${T.ink}}
   ul{list-style:none}
   li a{display:flex;justify-content:space-between;align-items:center;gap:16px;
