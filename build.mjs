@@ -189,7 +189,7 @@ function cardHTML(emp, co, ctx, opts = {}) {
   //  - otherwise                 → a pre-filled email to co.quotationEmail
   const qEmail = co.quotationEmail || emp.email || co.email || "";
   const qMailto = `mailto:${qEmail}?subject=${encodeURIComponent("Quotation request")}` +
-    `&body=${encodeURIComponent("Hello,\n\nI would like to request a quotation.")}`;
+    `&body=${encodeURIComponent("Hello, I would like to request a quotation.")}`;
   const quotationIsUrl = !!co.quotation && /^https?:/i.test(co.quotation);
   const quotationHref = quotationIsUrl ? co.quotation : qMailto;
 
