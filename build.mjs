@@ -8,10 +8,10 @@
 //           docs/<slug>.webp      optimised photo (from assets/<slug>.src.png)
 //           docs/<slug>.vcf       contact file
 //           docs/index.html       list of all cards
-//           docs/embed/<slug>.txt paste-into-Webflow <iframe> (auto-height, minified)
+//           docs/embed/<slug>.txt paste-into-Webflow block (scoped <div>, no iframe)
 //           docs/embed/index.html copy-button helper page
 //
-//  Design tokens: THEME.  Card markup: cardHTML().  QR: qrSvg() (build-time SVG).
+//  Design tokens: THEME.  Card markup: buildCard().  QR: qrSvg() (build-time SVG).
 //  sharp + jsqr (devDependencies) are used to (re)encode the photo and to verify
 //  that the generated QR really decodes to the right URL. If they are missing the
 //  build still runs (photo reuse / QR check skipped with a warning).
@@ -62,7 +62,7 @@ function findLogo() {
   return null;
 }
 
-// collapse whitespace for the embed's srcdoc (safe here: no <pre>, scripts are single-line)
+// collapse whitespace for the embed block (safe here: no <pre>, scripts are ;-terminated)
 const mini = (s) => s
   .replace(/<!--[\s\S]*?-->/g, "")
   .replace(/\n\s*/g, "")
@@ -165,9 +165,86 @@ function vcard(emp, co) {
 // ─── icons ───────────────────────────────────────────────────────────────────
 const LINKEDIN_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.07 2.07 0 1 1 0-4.14 2.07 2.07 0 0 1 0 4.14zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/></svg>`;
 
-// ─── card page ───────────────────────────────────────────────────────────────
-function cardHTML(emp, co, ctx, opts = {}) {
+// ─── card CSS ────────────────────────────────────────────────────────────────
+// One stylesheet, two modes:
+//   scope === ""                → standalone page (rules on :root / * / body)
+//   scope === "#cdrcard-<slug>" → Webflow embed: every selector is prefixed with
+//                                 the wrapper id so nothing leaks in or out.
+function cardStyles(scope = "") {
   const T = THEME;
+  const P = scope ? scope + " " : "";
+  const HOST = scope || ":root";
+  const BOX = scope ? `${scope},${scope} *` : "*";
+  const container = scope
+    ? `${scope}{display:block;width:100%;max-width:460px;margin:0 auto;background:transparent;color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:16px;font-weight:400;font-style:normal;line-height:1.5;letter-spacing:normal;text-align:left;-webkit-text-size-adjust:100%;text-size-adjust:100%}`
+    : `body{margin:0;background:${T.pageBg};color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}`;
+  const card = scope
+    ? `${P}.card{width:100%;max-width:460px;margin:0 auto;background:${T.paper};overflow:hidden}`
+    : `.card{width:100%;max-width:420px;margin:0 auto;background:${T.paper};border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.08)}`;
+  // Hardening — only for the embed. Neutralises host !important rules that a
+  // themed Webflow site may put on bare a / img / button (link colour, link
+  // underline, image border). Buttons (a.btn) are excluded from the colour reset.
+  const harden = scope ? `
+  ${P}a{text-decoration:none!important}
+  ${P}a:not(.btn){color:inherit!important}
+  ${P}img{border:0!important;box-shadow:none!important}
+  ${P}button{font-family:inherit!important;letter-spacing:normal!important;text-transform:none!important;font-size:14px!important}
+  ${P}.btn.primary{color:#fff!important}
+  ${P}.btn.ghost{color:var(--ink)!important}
+  ${P}.btn.lime{color:#000!important}
+  ${P}.qmenu>*{color:var(--ink)!important;font-size:14px!important}
+  ${P}.row:hover .v{text-decoration:underline!important}` : "";
+  return `
+  ${HOST}{--lime:${T.lime};--ink:${T.ink};--muted:${T.muted};--line:${T.line}}
+  ${BOX}{box-sizing:border-box}
+  ${container}
+  ${card}${harden}
+  ${P}img{max-width:100%;display:block}
+  ${P}a{color:inherit}
+  ${P}.brand{background:var(--lime);padding:26px 30px;display:flex;align-items:center;justify-content:center}
+  ${P}.brand-img{width:auto;max-width:52%;height:auto}
+  ${P}.brand-text{font-family:"Bebas Neue","Arial Narrow",sans-serif;font-weight:400;font-size:64px;line-height:.8;letter-spacing:.02em;color:#000}
+  ${P}.photo{position:relative;width:100%;aspect-ratio:5/4;background:#e9e9e9}
+  ${P}.photo img{width:100%;height:100%;object-fit:cover;object-position:center 18%}
+  ${P}.photo-fb{width:100%;height:100%;align-items:center;justify-content:center;font-family:"Bebas Neue",sans-serif;font-size:80px;color:#000;background:var(--lime)}
+  ${P}.pad{padding:26px 30px 30px}
+  ${P}.name{font-size:23px;font-weight:700;letter-spacing:-.01em}
+  ${P}.role{color:var(--muted);font-size:15px;margin-top:2px}
+  ${P}.org{font-size:14px;font-weight:600;margin-top:10px}
+  ${P}.unit{display:inline-block;margin-top:10px;padding:5px 11px;border-radius:999px;background:var(--lime);font-size:12px;font-weight:700}
+  ${P}.rows{margin-top:20px;border-top:1px solid var(--line)}
+  ${P}.row{display:flex;flex-direction:column;gap:2px;padding:13px 0;border-bottom:1px solid var(--line);text-decoration:none}
+  ${P}.row .k{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+  ${P}.row .v{font-size:15px;font-weight:600;word-break:break-word}
+  ${P}.row:hover .v{text-decoration:underline}
+  ${P}.social{display:flex;flex-wrap:wrap;gap:8px;padding:16px 0 2px}
+  ${P}.social a{display:inline-flex;align-items:center;gap:7px;padding:7px 11px 7px 9px;border:1px solid var(--line);border-radius:999px;color:var(--ink);font-size:12px;font-weight:600;text-decoration:none}
+  ${P}.social a svg{flex:none;width:15px;height:15px}
+  ${P}.social a:hover{background:var(--lime);border-color:var(--lime)}
+  ${P}.qr-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:20px;text-align:center}
+  ${P}.qr{width:190px;height:190px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;overflow:hidden}
+  ${P}.qr svg{width:100%;height:100%;display:block}
+  ${P}.qr-hint{font-size:12px;color:var(--muted)}
+  ${P}.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
+  ${P}.btn{display:flex;align-items:center;justify-content:center;text-align:center;min-height:52px;padding:12px 14px;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;border:1.5px solid var(--ink);font-family:inherit}
+  ${P}.btn.primary{background:var(--ink);color:#fff}
+  ${P}.btn.ghost{background:#fff;color:var(--ink)}
+  ${P}.btn.lime{background:var(--lime);color:#000;border-color:var(--lime);grid-column:1/-1}
+  ${P}.btn:active{transform:translateY(1px)}
+  ${P}.qmenu{grid-column:1/-1;flex-direction:column;gap:8px;margin-top:2px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fafafa}
+  ${P}.qmenu:not([hidden]){display:flex}
+  ${P}.qmenu>*{display:block;width:100%;text-align:center;padding:12px;border-radius:10px;border:1.5px solid var(--ink);background:#fff;color:var(--ink);font-weight:600;font-size:14px;line-height:1.2;font-family:inherit;text-decoration:none;cursor:pointer}
+  ${P}.qmenu .qx{border-color:var(--line);color:var(--muted);font-weight:500}
+  ${P}.foot{padding:15px 30px;background:#fafafa;border-top:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:12px}
+  ${P}.foot a{text-decoration:none}
+  @media(max-width:360px){
+    ${P}.pad{padding:22px 20px 26px}${P}.brand{padding:22px}${P}.brand-text{font-size:54px}
+    ${P}.actions{grid-template-columns:1fr}${P}.btn.ghost{grid-column:auto}
+  }`;
+}
+
+// ─── card markup (shared by the standalone page and the Webflow embed) ────────
+function buildCard(emp, co, ctx, opts = {}) {
   const embed = !!opts.embed;
   const fullName = `${emp.firstName} ${emp.lastName}`.trim();
   const a = co.address || {};
@@ -184,10 +261,9 @@ function cardHTML(emp, co, ctx, opts = {}) {
   const qrTarget = emp.qr || shareUrl || co.website || "";
   const vcfHref = "data:text/vcard;charset=utf-8," + encodeURIComponent(vcard(emp, co));
 
-  // Request a quotation — self-contained:
-  //  - co.quotation set to a URL → the button links there (opens on the top window)
-  //  - otherwise                 → the button opens a small "how do you want to send it"
-  //                                menu: email app (mailto) / Gmail / copy address
+  // Request a quotation — self-contained (no popup / no page selector):
+  //  - co.quotation is a URL → the button links straight there
+  //  - otherwise             → the button opens a small "how to send it" menu
   const qEmail = co.quotationEmail || emp.email || co.email || "";
   const qSubject = "Quotation request";
   const qBody = "Hello, I would like to request a quotation.";
@@ -220,91 +296,7 @@ function cardHTML(emp, co, ctx, opts = {}) {
       <div class="qr-hint">Scan to open this card</div>
     </div>` : "";
 
-  const heightScript = embed ? `<script>(function(){var S=${JSON.stringify(emp.slug)};function m(){var c=document.querySelector(".card");return Math.ceil((c?c.getBoundingClientRect().height:document.body.scrollHeight))}function h(){parent.postMessage({__cdrcard:S,h:m()},"*")}addEventListener("load",h);addEventListener("resize",h);if(window.ResizeObserver){try{new ResizeObserver(h).observe(document.body)}catch(e){}}var im=document.images[0];if(im){im.addEventListener("load",h);im.addEventListener("error",h)}setTimeout(h,120);setTimeout(h,500);setTimeout(h,1500);setTimeout(h,3000)})();</script>` : "";
-
-  const shareScript = shareUrl ? `<script>(function(){var u=${JSON.stringify(shareUrl)},b=document.getElementById("sh");if(!b)return;var d={title:${JSON.stringify(fullName + " — " + (co.legalName || co.name))},text:${JSON.stringify(fullName + ", " + (emp.title || ""))},url:u};b.addEventListener("click",function(e){if(navigator.share){e.preventDefault();navigator.share(d).catch(function(){})}else if(navigator.clipboard&&navigator.clipboard.writeText){e.preventDefault();navigator.clipboard.writeText(u).then(function(){var t=b.textContent;b.textContent="Link copied";setTimeout(function(){b.textContent=t},1800)})}})})();</script>` : "";
-
-  const quoteScript = quotationMenu ? `<script>(function(){var b=document.getElementById("rq"),m=document.getElementById("qm");if(!b||!m)return;function rs(){try{window.dispatchEvent(new Event("resize"))}catch(e){}}b.addEventListener("click",function(e){e.preventDefault();m.hidden=!m.hidden;rs()});m.querySelectorAll("[data-copy]").forEach(function(x){x.addEventListener("click",function(){var v=x.getAttribute("data-copy");if(navigator.clipboard)navigator.clipboard.writeText(v);var o=x.textContent;x.textContent="Copied: "+v;setTimeout(function(){x.textContent=o;m.hidden=true;rs()},1200)})});var c=m.querySelector(".qx");if(c)c.addEventListener("click",function(){m.hidden=true;rs()});m.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){setTimeout(function(){m.hidden=true;rs()},400)})})})();</script>` : "";
-
-
-  const bodyRule = embed
-    ? `body{margin:0;background:${T.paper};color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5}`
-    : `body{margin:0;background:${T.pageBg};color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}`;
-  const cardRule = embed
-    ? `.card{width:100%;max-width:460px;margin:0 auto;background:${T.paper};overflow:hidden}`
-    : `.card{width:100%;max-width:420px;background:${T.paper};border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.08)}`;
-
-  const head = embed
-    ? `<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">`
-    : `<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(fullName)} — ${esc(co.legalName || co.name)}</title>
-<meta name="description" content="${attr(fullName)}, ${attr(emp.title)} — ${attr(co.legalName || co.name)}. ${attr(co.unit || "")}">
-${shareUrl ? `<meta property="og:title" content="${attr(fullName + " — " + (co.legalName || co.name))}">
-<meta property="og:description" content="${attr((emp.title || "") + " · " + (co.unit || co.tagline))}">
-<meta property="og:type" content="profile">
-<meta property="og:url" content="${attr(shareUrl)}">` : ""}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">`;
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-${head}
-<style>
-  :root{--lime:${T.lime};--ink:${T.ink};--muted:${T.muted};--line:${T.line}}
-  *{box-sizing:border-box}
-  ${bodyRule}
-  ${cardRule}
-  img{max-width:100%;display:block}
-  a{color:inherit}
-  .brand{background:var(--lime);padding:26px 30px;display:flex;align-items:center;justify-content:center}
-  .brand-img{width:auto;max-width:52%;height:auto}
-  .brand-text{font-family:"Bebas Neue","Arial Narrow",sans-serif;font-weight:400;font-size:64px;line-height:.8;letter-spacing:.02em;color:#000}
-  .photo{position:relative;width:100%;aspect-ratio:5/4;background:#e9e9e9}
-  .photo img{width:100%;height:100%;object-fit:cover;object-position:center 18%}
-  .photo-fb{width:100%;height:100%;align-items:center;justify-content:center;font-family:"Bebas Neue",sans-serif;font-size:80px;color:#000;background:var(--lime)}
-  .pad{padding:26px 30px 30px}
-  .name{font-size:23px;font-weight:700;letter-spacing:-.01em}
-  .role{color:var(--muted);font-size:15px;margin-top:2px}
-  .org{font-size:14px;font-weight:600;margin-top:10px}
-  .unit{display:inline-block;margin-top:10px;padding:5px 11px;border-radius:999px;background:var(--lime);font-size:12px;font-weight:700}
-  .rows{margin-top:20px;border-top:1px solid var(--line)}
-  .row{display:flex;flex-direction:column;gap:2px;padding:13px 0;border-bottom:1px solid var(--line);text-decoration:none}
-  .row .k{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
-  .row .v{font-size:15px;font-weight:600;word-break:break-word}
-  .row:hover .v{text-decoration:underline}
-  .social{display:flex;flex-wrap:wrap;gap:8px;padding:16px 0 2px}
-  .social a{display:inline-flex;align-items:center;gap:7px;padding:7px 11px 7px 9px;border:1px solid var(--line);border-radius:999px;color:var(--ink);font-size:12px;font-weight:600;text-decoration:none}
-  .social a svg{flex:none;width:15px;height:15px}
-  .social a:hover{background:var(--lime);border-color:var(--lime)}
-  .qr-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:20px;text-align:center}
-  .qr{width:190px;height:190px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;overflow:hidden}
-  .qr svg{width:100%;height:100%;display:block}
-  .qr-hint{font-size:12px;color:var(--muted)}
-  .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
-  .btn{display:flex;align-items:center;justify-content:center;text-align:center;min-height:52px;padding:12px 14px;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;border:1.5px solid var(--ink)}
-  .btn.primary{background:var(--ink);color:#fff}
-  .btn.ghost{background:#fff;color:var(--ink)}
-  .btn.lime{background:var(--lime);color:#000;border-color:var(--lime);grid-column:1/-1}
-  .btn:active{transform:translateY(1px)}
-  .qmenu{grid-column:1/-1;flex-direction:column;gap:8px;margin-top:2px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fafafa}
-  .qmenu:not([hidden]){display:flex}
-  .qmenu>*{display:block;width:100%;text-align:center;padding:12px;border-radius:10px;border:1.5px solid var(--ink);background:#fff;color:var(--ink);font:600 14px/1.2 inherit;text-decoration:none;cursor:pointer}
-  .qmenu .qx{border-color:var(--line);color:var(--muted);font-weight:500}
-  .foot{padding:15px 30px;background:#fafafa;border-top:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:12px}
-  .foot a{text-decoration:none}
-  @media(max-width:360px){
-    .pad{padding:22px 20px 26px}.brand{padding:22px}.brand-text{font-size:54px}
-    .actions{grid-template-columns:1fr}.btn.ghost{grid-column:auto}
-  }
-</style>
-</head>
-<body>
-<main class="card">
+  const markup = `<main class="card">
   <div class="brand">${logo}</div>
   ${photo}
   <div class="pad">
@@ -314,8 +306,8 @@ ${head}
     ${co.unit ? `<div class="unit">${esc(co.unit)}</div>` : ""}
 
     <div class="rows">
-      ${emp.phone ? `<a class="row" href="${attr(telHref(emp.phone))}"${embed ? ' target="_top"' : ""}><span class="k">Phone</span><span class="v">${esc(emp.phone)}</span></a>` : ""}
-      ${emp.email ? `<a class="row" href="mailto:${attr(emp.email)}"${embed ? ' target="_top"' : ""}><span class="k">Email</span><span class="v">${esc(emp.email)}</span></a>` : ""}
+      ${emp.phone ? `<a class="row" href="${attr(telHref(emp.phone))}"><span class="k">Phone</span><span class="v">${esc(emp.phone)}</span></a>` : ""}
+      ${emp.email ? `<a class="row" href="mailto:${attr(emp.email)}"><span class="k">Email</span><span class="v">${esc(emp.email)}</span></a>` : ""}
       ${co.website ? `<a class="row" href="${attr(co.website)}" target="_blank" rel="noopener noreferrer"><span class="k">Website</span><span class="v">${esc(co.websiteLabel || co.website)}</span></a>` : ""}
       ${addrOneLine ? `<a class="row" href="${attr(mapsHref(addrOneLine))}" target="_blank" rel="noopener noreferrer"><span class="k">Address (open in Maps)</span><span class="v">${addrLines.map(esc).join("<br>")}</span></a>` : ""}
     </div>
@@ -329,10 +321,10 @@ ${head}
 
     <div class="actions">
       <a class="btn primary" href="${attr(vcfHref)}" download="${attr(emp.slug)}.vcf">Save contact</a>
-      ${shareUrl ? `<a class="btn ghost" id="sh" href="${attr(shareUrl)}">Share</a>` : ""}
-      <a class="btn lime" id="rq" href="${attr(quotationHref)}"${(quotationIsUrl || (embed && !quotationMenu)) ? ` target="_top"${quotationIsUrl ? ' rel="noopener noreferrer"' : ""}` : ""}>Request a quotation</a>
-      ${quotationMenu ? `<div class="qmenu" id="qm" hidden>
-        <a href="${attr(qMailto)}" target="_top">Open in email app</a>
+      ${shareUrl ? `<a class="btn ghost" data-cdr="share" href="${attr(shareUrl)}">Share</a>` : ""}
+      <a class="btn lime" data-cdr="quote" href="${attr(quotationHref)}"${quotationIsUrl ? ` target="_blank" rel="noopener noreferrer"` : ""}>Request a quotation</a>
+      ${quotationMenu ? `<div class="qmenu" data-cdr="qmenu" hidden>
+        <a href="${attr(qMailto)}">Open in email app</a>
         <a href="${attr(qGmail)}" target="_blank" rel="noopener noreferrer">Open in Gmail</a>
         <button type="button" data-copy="${attr(qEmail)}">Copy ${esc(qEmail)}</button>
         <button type="button" class="qx">Cancel</button>
@@ -344,61 +336,111 @@ ${head}
     <span>${esc(co.legalName || co.name)}</span>
     ${co.website ? `<a href="${attr(co.website)}" target="_blank" rel="noopener noreferrer">${esc(co.websiteLabel || co.website)}</a>` : ""}
   </div>
-</main>
-${heightScript}
-${shareScript}
-${quoteScript}
+</main>`;
+
+  return { markup, fullName, shareUrl, qrTarget };
+}
+
+// ─── behaviour script (Share + Request-a-quotation menu) ─────────────────────
+// Works the same standalone or embedded: it looks up its elements inside `root`
+// (document, or the #cdrcard-<slug> wrapper) via [data-cdr] attributes, so two
+// cards on one page never collide.
+function cardScripts(emp, co, opts = {}) {
+  const embed = !!opts.embed;
+  const fullName = `${emp.firstName} ${emp.lastName}`.trim();
+  const base = (co.baseUrl || "").replace(/\/+$/, "");
+  const suffix = co.urlSuffix ?? ".html";
+  const shareUrl = base ? `${base}/${emp.slug}${suffix}` : "";
+  const rootExpr = embed ? `document.getElementById(${JSON.stringify("cdrcard-" + emp.slug)})` : "document";
+  const guard = embed
+    ? `if(!R||R.getAttribute("data-cdr-ready"))return;R.setAttribute("data-cdr-ready","1");`
+    : "";
+  const shareData = JSON.stringify({
+    title: `${fullName} — ${co.legalName || co.name}`,
+    text: `${fullName}, ${emp.title || ""}`,
+    url: shareUrl,
+  });
+  return `<script>
+(function(){
+  function init(){
+    var R=${rootExpr};
+    ${guard}
+    var sb=R.querySelector('[data-cdr="share"]');
+    if(sb){
+      var d=${shareData},u=d.url;
+      sb.addEventListener("click",function(e){
+        if(navigator.share){e.preventDefault();navigator.share(d).catch(function(){});}
+        else if(navigator.clipboard&&navigator.clipboard.writeText){e.preventDefault();navigator.clipboard.writeText(u).then(function(){var t=sb.textContent;sb.textContent="Link copied";setTimeout(function(){sb.textContent=t},1800);});}
+      });
+    }
+    var qb=R.querySelector('[data-cdr="quote"]'),qm=R.querySelector('[data-cdr="qmenu"]');
+    if(qb&&qm){
+      qb.addEventListener("click",function(e){e.preventDefault();qm.hidden=!qm.hidden;});
+      qm.querySelectorAll("[data-copy]").forEach(function(x){
+        x.addEventListener("click",function(){
+          var v=x.getAttribute("data-copy");
+          if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(v);
+          var o=x.textContent;x.textContent="Copied: "+v;
+          setTimeout(function(){x.textContent=o;qm.hidden=true;},1200);
+        });
+      });
+      var qx=qm.querySelector(".qx");
+      if(qx)qx.addEventListener("click",function(){qm.hidden=true;});
+      qm.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){setTimeout(function(){qm.hidden=true;},400);});});
+    }
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);
+  else init();
+})();
+</script>`;
+}
+
+// ─── standalone card page ────────────────────────────────────────────────────
+function cardHTML(emp, co, ctx) {
+  const { markup, fullName, shareUrl } = buildCard(emp, co, ctx, { embed: false });
+  const head = `<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(fullName)} — ${esc(co.legalName || co.name)}</title>
+<meta name="description" content="${attr(fullName)}, ${attr(emp.title)} — ${attr(co.legalName || co.name)}. ${attr(co.unit || "")}">
+${shareUrl ? `<meta property="og:title" content="${attr(fullName + " — " + (co.legalName || co.name))}">
+<meta property="og:description" content="${attr((emp.title || "") + " · " + (co.unit || co.tagline))}">
+<meta property="og:type" content="profile">
+<meta property="og:url" content="${attr(shareUrl)}">` : ""}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+${head}
+<style>${cardStyles("")}</style>
+</head>
+<body>
+${markup}
+${cardScripts(emp, co, { embed: false })}
 </body>
 </html>
 `;
 }
 
 // ─── Webflow embed ───────────────────────────────────────────────────────────
-// A tiny mount <div id> + one <script>. The script finds the div by id (timing-
-// independent), builds the iframe once (dedup guard), and wires the auto-height
-// listener — all in the same block. If the paste is incomplete you just get an
-// empty invisible div, never a half-broken card. Card HTML goes into f.srcdoc as
-// a JS template literal (backtick / ${ / </script> escaped).
+// A CSS-scoped <div> injected straight into the Webflow page — NO iframe.
+// (An iframe fed by srcdoc / document.write renders blank on iOS Safari and is
+// what kept breaking.) Every CSS selector is prefixed with #cdrcard-<slug> so
+// the page's styles can't reach in and the card's styles can't reach out. The
+// card sits in normal document flow, so its height is always correct — no
+// postMessage, no auto-resize, nothing to get "cropped".
 function embedSnippet(emp, co, ctx) {
-  const fullName = `${emp.firstName} ${emp.lastName}`.trim();
-  const card = mini(cardHTML(emp, co, ctx, { embed: true }))
-    .replace(/\\/g, "\\\\")
-    .replace(/`/g, "\\`")
-    .replace(/\$\{/g, "\\${")
-    .replace(/<\/script>/g, "<\\/script>");
-  const s = JSON.stringify(emp.slug);
-  const hostId = `cdrcard-${emp.slug}`;
-  return `<!-- ${fullName} — C.D.R Technology digital business card. Paste this WHOLE block into a Webflow HTML Embed. -->
-<div id="${hostId}" style="display:block"></div>
-<script>
-(function(){
-  var SLUG = ${s}, HOST = "${hostId}";
-  var HTML = \`${card}\`;
-  function build(){
-    var host = document.getElementById(HOST);
-    if (!host || host.getAttribute("data-cdr")) return;
-    host.setAttribute("data-cdr", "1");
-    var f = document.createElement("iframe");
-    f.title = ${JSON.stringify(fullName + " — business card")};
-    f.setAttribute("scrolling", "no");
-    f.style.cssText = "width:100%;max-width:460px;border:0;display:block;margin:0 auto;height:1500px";
-    host.appendChild(f);
-    // write into the iframe (reliable on iOS Safari, unlike setting srcdoc before append)
-    try {
-      var idoc = f.contentDocument || f.contentWindow.document;
-      idoc.open(); idoc.write(HTML); idoc.close();
-    } catch (e) {
-      f.setAttribute("srcdoc", HTML);
-    }
-    window.addEventListener("message", function(e){
-      var d = e.data;
-      if (d && d.__cdrcard === SLUG && d.h) f.style.height = d.h + "px";
-    });
-  }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build);
-  else build();
-})();
-</script>
+  const id = `cdrcard-${emp.slug}`;
+  const { markup, fullName } = buildCard(emp, co, ctx, { embed: true });
+  const styles = cardStyles(`#${id}`);
+  const scripts = cardScripts(emp, co, { embed: true });
+  const block = mini(`<div id="${id}" class="cdrcard"><style>${styles}</style>${markup}${scripts}</div>`);
+  return `<!-- ${fullName} — C.D.R Technology digital business card.
+     Paste this WHOLE block into one Webflow HTML Embed, Save, then Publish the
+     page at ${co.baseUrl || ""}/${emp.slug} so the QR code resolves. -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+${block}
 `;
 }
 
@@ -433,12 +475,12 @@ function embedIndexHTML(list, co, ctx) {
   textarea{width:100%;height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;border:1px solid ${T.line};border-radius:8px;padding:10px;resize:vertical;background:#fafafa;color:#333;white-space:pre}
 </style></head><body><div class="wrap">
   <h1>${esc(co.name)} — Webflow embed codes</h1>
-  <p class="lead">One HTML Embed per person. The photo is embedded in the code — nothing else to upload.
-  The card is an auto-resizing <code>&lt;iframe&gt;</code>: no inner scrollbar, height follows the content,
-  isolated from the page's CSS.</p>
+  <p class="lead">One HTML Embed per person. The card is a CSS-scoped <code>&lt;div&gt;</code> — no iframe,
+  no inner scrollbar, height follows the content, and the page's styles can't reach into it.
+  The photo loads from the shared asset host — nothing else to upload.</p>
   <div class="note">
-    <b>Copy embed code</b> → in Webflow drag in an <b>HTML Embed</b> → paste → <b>Save</b> → <b>Publish</b> the page.
-    Publish the page at <code>${esc(co.baseUrl || "")}/&lt;slug&gt;</code> so the QR resolves.
+    <b>Copy embed code</b> → in Webflow drag in an <b>HTML Embed</b> → paste the whole block → <b>Save</b> → <b>Publish</b> the page.
+    Publish it at <code>${esc(co.baseUrl || "")}/&lt;slug&gt;</code> so the QR resolves.
   </div>
   ${rows}
 </div>
@@ -447,7 +489,6 @@ function embedIndexHTML(list, co, ctx) {
     b.addEventListener("click",function(){
       var ta=document.getElementById(b.dataset.t);
       ta.hidden=false;ta.select();navigator.clipboard.writeText(ta.value);
-      if(ta.id[0]==="l")ta.hidden=true;
       var o=b.textContent;b.textContent="Copied \u2713";b.classList.add("ok");
       setTimeout(function(){b.textContent=o;b.classList.remove("ok")},1600);
     });
@@ -533,7 +574,7 @@ async function main() {
     const ctx = { logoFile, qr, photoDataUri };
     ctxBySlug[emp.slug] = ctx;
 
-    writeFileSync(join(OUT, `${emp.slug}.html`), cardHTML(emp, company, ctx, { embed: false }));
+    writeFileSync(join(OUT, `${emp.slug}.html`), cardHTML(emp, company, ctx));
     writeFileSync(join(OUT, `${emp.slug}.vcf`), vcard(emp, company));
     const snip = embedSnippet(emp, company, ctx);
     writeFileSync(join(OUT, "embed", `${emp.slug}.txt`), snip);

@@ -16,7 +16,7 @@
   :root{--lime:#d1ec3a;--ink:#111111;--muted:#6b6b6b;--line:#e7e7e7}
   *{box-sizing:border-box}
   body{margin:0;background:#f4f4f2;color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-  .card{width:100%;max-width:420px;background:#ffffff;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.08)}
+  .card{width:100%;max-width:420px;margin:0 auto;background:#ffffff;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.08)}
   img{max-width:100%;display:block}
   a{color:inherit}
   .brand{background:var(--lime);padding:26px 30px;display:flex;align-items:center;justify-content:center}
@@ -44,22 +44,21 @@
   .qr svg{width:100%;height:100%;display:block}
   .qr-hint{font-size:12px;color:var(--muted)}
   .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
-  .btn{display:flex;align-items:center;justify-content:center;text-align:center;min-height:52px;padding:12px 14px;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;border:1.5px solid var(--ink)}
+  .btn{display:flex;align-items:center;justify-content:center;text-align:center;min-height:52px;padding:12px 14px;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;border:1.5px solid var(--ink);font-family:inherit}
   .btn.primary{background:var(--ink);color:#fff}
   .btn.ghost{background:#fff;color:var(--ink)}
   .btn.lime{background:var(--lime);color:#000;border-color:var(--lime);grid-column:1/-1}
   .btn:active{transform:translateY(1px)}
   .qmenu{grid-column:1/-1;flex-direction:column;gap:8px;margin-top:2px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fafafa}
   .qmenu:not([hidden]){display:flex}
-  .qmenu>*{display:block;width:100%;text-align:center;padding:12px;border-radius:10px;border:1.5px solid var(--ink);background:#fff;color:var(--ink);font:600 14px/1.2 inherit;text-decoration:none;cursor:pointer}
+  .qmenu>*{display:block;width:100%;text-align:center;padding:12px;border-radius:10px;border:1.5px solid var(--ink);background:#fff;color:var(--ink);font-weight:600;font-size:14px;line-height:1.2;font-family:inherit;text-decoration:none;cursor:pointer}
   .qmenu .qx{border-color:var(--line);color:var(--muted);font-weight:500}
   .foot{padding:15px 30px;background:#fafafa;border-top:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:12px}
   .foot a{text-decoration:none}
   @media(max-width:360px){
     .pad{padding:22px 20px 26px}.brand{padding:22px}.brand-text{font-size:54px}
     .actions{grid-template-columns:1fr}.btn.ghost{grid-column:auto}
-  }
-</style>
+  }</style>
 </head>
 <body>
 <main class="card">
@@ -94,10 +93,10 @@
 
     <div class="actions">
       <a class="btn primary" href="data:text/vcard;charset=utf-8,BEGIN%3AVCARD%0D%0AVERSION%3A3.0%0D%0AN%3ABennai%3BOmar%3B%3B%3B%0D%0AFN%3AOmar%20Bennai%0D%0AORG%3AC.D.R%20Technology%20O%C3%9C%3BGPU%20%26%20GSE%20Equipment%0D%0ATITLE%3ARegional%20Sales%20Manager%0D%0ATEL%3BTYPE%3DWORK%2CVOICE%3A%2B372%20512%2043%2036%0D%0AEMAIL%3BTYPE%3DWORK%3Aob%40cdr.ee%0D%0AURL%3Ahttps%3A%2F%2Fcdr.ee%0D%0AX-SOCIALPROFILE%3BTYPE%3Dlinkedin%3Ahttps%3A%2F%2Fwww.linkedin.com%2Fin%2Fomar-bennai%2F%0D%0AADR%3BTYPE%3DWORK%3A%3B%3BTaevav%C3%A4rava%20tee%206b-24%3BLehmja%20k%C3%BCla%5C%2C%20Rae%20vald%5C%2C%20Harju%20maakond%3B%3B75306%3BEstonia%0D%0AEND%3AVCARD%0D%0A" download="omar-bennai.vcf">Save contact</a>
-      <a class="btn ghost" id="sh" href="https://cdr.ee/business-cards/omar-bennai">Share</a>
-      <a class="btn lime" id="rq" href="mailto:info@cdr.ee?subject=Quotation%20request&amp;body=Hello%2C%20I%20would%20like%20to%20request%20a%20quotation.">Request a quotation</a>
-      <div class="qmenu" id="qm" hidden>
-        <a href="mailto:info@cdr.ee?subject=Quotation%20request&amp;body=Hello%2C%20I%20would%20like%20to%20request%20a%20quotation." target="_top">Open in email app</a>
+      <a class="btn ghost" data-cdr="share" href="https://cdr.ee/business-cards/omar-bennai">Share</a>
+      <a class="btn lime" data-cdr="quote" href="mailto:info@cdr.ee?subject=Quotation%20request&amp;body=Hello%2C%20I%20would%20like%20to%20request%20a%20quotation.">Request a quotation</a>
+      <div class="qmenu" data-cdr="qmenu" hidden>
+        <a href="mailto:info@cdr.ee?subject=Quotation%20request&amp;body=Hello%2C%20I%20would%20like%20to%20request%20a%20quotation.">Open in email app</a>
         <a href="https://mail.google.com/mail/?view=cm&amp;fs=1&amp;to=info%40cdr.ee&amp;su=Quotation%20request&amp;body=Hello%2C%20I%20would%20like%20to%20request%20a%20quotation." target="_blank" rel="noopener noreferrer">Open in Gmail</a>
         <button type="button" data-copy="info@cdr.ee">Copy info@cdr.ee</button>
         <button type="button" class="qx">Cancel</button>
@@ -110,8 +109,38 @@
     <a href="https://cdr.ee" target="_blank" rel="noopener noreferrer">cdr.ee</a>
   </div>
 </main>
-
-<script>(function(){var u="https://cdr.ee/business-cards/omar-bennai",b=document.getElementById("sh");if(!b)return;var d={title:"Omar Bennai — C.D.R Technology OÜ",text:"Omar Bennai, Regional Sales Manager",url:u};b.addEventListener("click",function(e){if(navigator.share){e.preventDefault();navigator.share(d).catch(function(){})}else if(navigator.clipboard&&navigator.clipboard.writeText){e.preventDefault();navigator.clipboard.writeText(u).then(function(){var t=b.textContent;b.textContent="Link copied";setTimeout(function(){b.textContent=t},1800)})}})})();</script>
-<script>(function(){var b=document.getElementById("rq"),m=document.getElementById("qm");if(!b||!m)return;function rs(){try{window.dispatchEvent(new Event("resize"))}catch(e){}}b.addEventListener("click",function(e){e.preventDefault();m.hidden=!m.hidden;rs()});m.querySelectorAll("[data-copy]").forEach(function(x){x.addEventListener("click",function(){var v=x.getAttribute("data-copy");if(navigator.clipboard)navigator.clipboard.writeText(v);var o=x.textContent;x.textContent="Copied: "+v;setTimeout(function(){x.textContent=o;m.hidden=true;rs()},1200)})});var c=m.querySelector(".qx");if(c)c.addEventListener("click",function(){m.hidden=true;rs()});m.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){setTimeout(function(){m.hidden=true;rs()},400)})})})();</script>
+<script>
+(function(){
+  function init(){
+    var R=document;
+    
+    var sb=R.querySelector('[data-cdr="share"]');
+    if(sb){
+      var d={"title":"Omar Bennai — C.D.R Technology OÜ","text":"Omar Bennai, Regional Sales Manager","url":"https://cdr.ee/business-cards/omar-bennai"},u=d.url;
+      sb.addEventListener("click",function(e){
+        if(navigator.share){e.preventDefault();navigator.share(d).catch(function(){});}
+        else if(navigator.clipboard&&navigator.clipboard.writeText){e.preventDefault();navigator.clipboard.writeText(u).then(function(){var t=sb.textContent;sb.textContent="Link copied";setTimeout(function(){sb.textContent=t},1800);});}
+      });
+    }
+    var qb=R.querySelector('[data-cdr="quote"]'),qm=R.querySelector('[data-cdr="qmenu"]');
+    if(qb&&qm){
+      qb.addEventListener("click",function(e){e.preventDefault();qm.hidden=!qm.hidden;});
+      qm.querySelectorAll("[data-copy]").forEach(function(x){
+        x.addEventListener("click",function(){
+          var v=x.getAttribute("data-copy");
+          if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(v);
+          var o=x.textContent;x.textContent="Copied: "+v;
+          setTimeout(function(){x.textContent=o;qm.hidden=true;},1200);
+        });
+      });
+      var qx=qm.querySelector(".qx");
+      if(qx)qx.addEventListener("click",function(){qm.hidden=true;});
+      qm.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){setTimeout(function(){qm.hidden=true;},400);});});
+    }
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);
+  else init();
+})();
+</script>
 </body>
 </html>

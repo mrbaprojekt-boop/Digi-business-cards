@@ -1,11 +1,11 @@
 ---
 name: business-card
-description: Generates C.D.R Technology employee digital business cards from digital-business-cards/data/employees.json — a standalone HTML card, an optimised WebP photo, a .vcf, and a self-contained Webflow <iframe> embed per person. Handles adding/editing/removing an employee, company-wide data (address, LinkedIn, quotation), photos, and restyling. Use when asked to add/edit/remove a card, swap a photo, update company info, or "rebuild the cards".
+description: Generates C.D.R Technology employee digital business cards from digital-business-cards/data/employees.json — a standalone HTML card, an optimised WebP photo, a .vcf, and a CSS-scoped Webflow embed (a plain <div>, no iframe) per person. Handles adding/editing/removing an employee, company-wide data (address, LinkedIn, quotation), photos, and restyling. Use when asked to add/edit/remove a card, swap a photo, update company info, or "rebuild the cards".
 ---
 
 # business-card — C.D.R Technology digital business cards
 
-Project: `digital-business-cards/`  (repo `github.com/mrbaprojekt-boop/Digi-business-cards`, private)
+Project: `digital-business-cards/`  (repo `github.com/mrbaprojekt-boop/Digi-business-cards`, public)
 
 ```
 data/employees.json     the ONLY source of data
@@ -13,7 +13,7 @@ assets/<slug>.src.png   photo source (~square) — build crops it to WebP
 assets/logo.svg|png     optional official logo
 build.mjs               generator (needs devDeps sharp + jsqr for photo + QR check)
 docs/                    GENERATED: <slug>.html, <slug>.webp, <slug>.vcf, index.html,
-                         embed/<slug>.txt (Webflow iframe), embed/index.html (copy page)
+                         embed/<slug>.txt (Webflow embed: scoped <div>), embed/index.html (copy page)
 ```
 
 ## ⚠️ Workspace path has a non-breaking space (U+00A0)
@@ -62,6 +62,11 @@ the card's own URL = `baseUrl` + `/` + `slug` + `urlSuffix`).
 - Edit only `data/employees.json`, `assets/*`, and (for design) `build.mjs`.
 - `slug` unique and stable; the QR encodes `baseUrl/<slug><urlSuffix>`.
 - Always rebuild; the build self-verifies the QR — do not ship if it fails.
-- The Webflow embed is one self-contained `<iframe srcdoc>` with the photo inlined as
-  WebP and an auto-height postMessage script. Keep it under 50 000 characters.
+- The Webflow embed is NOT an iframe. It is a `<div id="cdrcard-<slug>">` holding a
+  `<style>` whose every selector is prefixed with `#cdrcard-<slug>` (nothing leaks in
+  or out), the card markup, and one small `<script>` (Share + quotation menu). The
+  photo loads from `company.assetBase` (GitHub Pages). The card is in normal document
+  flow, so height is always correct — no postMessage, no auto-resize. iOS Safari renders
+  an iframe fed by srcdoc / document.write blank; that is why this is a plain div.
+  Keep it under 50 000 characters.
 - No Read/Write/Edit/Glob in this project — PowerShell/Bash/node only.

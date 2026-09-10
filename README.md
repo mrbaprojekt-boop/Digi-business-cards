@@ -9,8 +9,8 @@ Maps, small social icons, a QR code, and three big buttons — **Save contact**,
 Two outputs from one JSON file:
 
 1. **`docs/<slug>.html`** — a standalone card page (self-contained, opens from disk).
-2. **`docs/embed/<slug>.txt`** — a self-contained `<iframe>` to paste into a
-   **Webflow HTML Embed** (auto-height, no inner scrollbar, photo inlined).
+2. **`docs/embed/<slug>.txt`** — a CSS-scoped `<div>` (NOT an iframe) to paste into a
+   **Webflow HTML Embed** (no inner scrollbar, height follows content, style-isolated).
 
 ---
 
@@ -33,7 +33,7 @@ Digi-business-cards/
 │   ├── <slug>.vcf               contact file
 │   └── embed/
 │       ├── index.html               open this, click "Copy embed code"
-│       └── <slug>.txt               the <iframe> snippet for Webflow
+│       └── <slug>.txt               the embed snippet for Webflow (scoped <div>)
 └── README.md
 ```
 
@@ -141,9 +141,12 @@ The build prints, per person: the QR check result, the photo sizes, and the embe
 2. Open **`docs/embed/index.html`** → **Copy embed code** for the person.
 3. Webflow → their page → drag in an **HTML Embed** → paste → **Save** → **Publish**.
 
-The embed is one self-contained `<iframe>` (~32 KB, well under Webflow's 50 000-char
-limit). The photo is baked in as an optimised WebP; the QR is inline SVG; the card is
-isolated from Webflow's CSS; the iframe height follows the content (no inner scrollbar).
+The embed is a `<div id="cdrcard-<slug>">` — no iframe (~15 KB, well under Webflow's
+50 000-char limit). Every CSS selector inside is prefixed with `#cdrcard-<slug>`, so the
+page's styles can't reach in and the card's styles can't reach out. The QR is inline SVG;
+the photo loads from `company.assetBase` (GitHub Pages). The card sits in normal document
+flow, so its height is always correct — no postMessage, no auto-resize, nothing to crop.
+(An iframe fed by `srcdoc` / `document.write` renders blank on iOS Safari — hence a div.)
 
 Publish each person's page at exactly `baseUrl + "/" + slug` (e.g.
 `https://cdr.ee/business-cards/elmahdi-lamine`) so the QR and Share resolve.
@@ -163,7 +166,7 @@ Copy the contents of `docs/` to the host. The card URLs are `<host>/<slug>` (or
 
 | Button | Action |
 |---|---|
-| **Save contact** | downloads a vCard (`data:` URI — works everywhere, incl. inside the Webflow iframe) with full name, title, company `C.D.R Technology OÜ`, phone, email, website, address |
+| **Save contact** | downloads a vCard (`data:` URI — works everywhere) with full name, title, company `C.D.R Technology OÜ`, phone, email, website, address |
 | **Request a quotation** | opens the `company.quotation` URL if set; otherwise a pre-filled email to the person, subject **Quotation request** |
 | **Share** | native share sheet on mobile, copy-link on desktop |
 
