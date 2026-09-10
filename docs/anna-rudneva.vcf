@@ -1,0 +1,12 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Rudneva;Anna;;;
+FN:Anna Rudneva
+ORG:C.D.R Technology OÜ;GPU & GSE Equipment
+TITLE:Marketing Director
+TEL;TYPE=WORK,VOICE:+372 553 87 45
+EMAIL;TYPE=WORK:ar@cdr.ee
+URL:https://cdr.ee
+X-SOCIALPROFILE;TYPE=linkedin:https://www.linkedin.com/in/anna-rudneva/
+ADR;TYPE=WORK:;;Taevavärava tee 6b-24;Lehmja küla\, Rae vald\, Harju maakond;;75306;Estonia
+END:VCARD

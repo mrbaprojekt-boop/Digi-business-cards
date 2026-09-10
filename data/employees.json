@@ -74,6 +74,17 @@
       "linkedin": "https://www.linkedin.com/in/omar-bennai/",
       "photo": "omar-bennai.webp",
       "qr": ""
+    },
+    {
+      "slug": "anna-rudneva",
+      "firstName": "Anna",
+      "lastName": "Rudneva",
+      "title": "Marketing Director",
+      "phone": "+372 553 87 45",
+      "email": "ar@cdr.ee",
+      "linkedin": "https://www.linkedin.com/in/anna-rudneva/",
+      "photo": "anna-rudneva.webp",
+      "qr": ""
     }
   ]
 }
