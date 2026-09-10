@@ -63,6 +63,17 @@
       "linkedin": "https://www.linkedin.com/in/deniss-gorlatsov-13418b1b2/",
       "photo": "deniss-gorlatsov.webp",
       "qr": ""
+    },
+    {
+      "slug": "omar-bennai",
+      "firstName": "Omar",
+      "lastName": "Bennai",
+      "title": "Regional Sales Manager",
+      "phone": "+372 512 43 36",
+      "email": "ob@cdr.ee",
+      "linkedin": "https://www.linkedin.com/in/omar-bennai/",
+      "photo": "omar-bennai.webp",
+      "qr": ""
     }
   ]
 }

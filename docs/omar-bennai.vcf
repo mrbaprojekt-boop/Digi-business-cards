@@ -1,0 +1,12 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Bennai;Omar;;;
+FN:Omar Bennai
+ORG:C.D.R Technology OÜ;GPU & GSE Equipment
+TITLE:Regional Sales Manager
+TEL;TYPE=WORK,VOICE:+372 512 43 36
+EMAIL;TYPE=WORK:ob@cdr.ee
+URL:https://cdr.ee
+X-SOCIALPROFILE;TYPE=linkedin:https://www.linkedin.com/in/omar-bennai/
+ADR;TYPE=WORK:;;Taevavärava tee 6b-24;Lehmja küla\, Rae vald\, Harju maakond;;75306;Estonia
+END:VCARD
