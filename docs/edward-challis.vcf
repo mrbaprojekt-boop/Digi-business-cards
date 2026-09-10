@@ -1,0 +1,12 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Challis;Edward;;;
+FN:Edward Challis
+ORG:C.D.R Technology OÜ;GPU & GSE Equipment
+TITLE:Global Sales Director
+TEL;TYPE=WORK,VOICE:+372 559 02 161
+EMAIL;TYPE=WORK:ec@cdr.ee
+URL:https://cdr.ee
+X-SOCIALPROFILE;TYPE=linkedin:https://www.linkedin.com/in/edward-c-a90a5840/
+ADR;TYPE=WORK:;;Taevavärava tee 6b-24;Lehmja küla\, Rae vald\, Harju maakond;;75306;Estonia
+END:VCARD

@@ -30,6 +30,17 @@
       "linkedin": "https://www.linkedin.com/in/elmahdi-lamine-638b25b6/",
       "photo": "elmahdi-lamine.webp",
       "qr": ""
+    },
+    {
+      "slug": "edward-challis",
+      "firstName": "Edward",
+      "lastName": "Challis",
+      "title": "Global Sales Director",
+      "phone": "+372 559 02 161",
+      "email": "ec@cdr.ee",
+      "linkedin": "https://www.linkedin.com/in/edward-c-a90a5840/",
+      "photo": "edward-challis.webp",
+      "qr": ""
     }
   ]
 }
