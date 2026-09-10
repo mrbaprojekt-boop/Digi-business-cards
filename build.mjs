@@ -373,6 +373,7 @@ function embedSnippet(emp, co, ctx) {
 <script>
 (function(){
   var SLUG = ${s}, HOST = "${hostId}";
+  var HTML = \`${card}\`;
   function build(){
     var host = document.getElementById(HOST);
     if (!host || host.getAttribute("data-cdr")) return;
@@ -380,10 +381,15 @@ function embedSnippet(emp, co, ctx) {
     var f = document.createElement("iframe");
     f.title = ${JSON.stringify(fullName + " — business card")};
     f.setAttribute("scrolling", "no");
-    f.setAttribute("loading", "lazy");
     f.style.cssText = "width:100%;max-width:460px;border:0;display:block;margin:0 auto;height:1500px";
-    f.srcdoc = \`${card}\`;
     host.appendChild(f);
+    // write into the iframe (reliable on iOS Safari, unlike setting srcdoc before append)
+    try {
+      var idoc = f.contentDocument || f.contentWindow.document;
+      idoc.open(); idoc.write(HTML); idoc.close();
+    } catch (e) {
+      f.setAttribute("srcdoc", HTML);
+    }
     window.addEventListener("message", function(e){
       var d = e.data;
       if (d && d.__cdrcard === SLUG && d.h) f.style.height = d.h + "px";
